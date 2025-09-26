@@ -78,20 +78,7 @@ stages:
         
         echo Creating clean package.json for deployment...
         cd ..\deploy-package
-        powershell -Command "
-        $original = Get-Content package.json | ConvertFrom-Json;
-        $clean = @{
-          name = $original.name;
-          version = $original.version;
-          main = 'dist/app.js';
-          scripts = @{
-            start = 'node dist/app.js'
-          };
-          engines = $original.engines;
-          dependencies = $original.dependencies
-        };
-        $clean | ConvertTo-Json -Depth 10 | Set-Content package.json
-        "
+        powershell -Command "$original = Get-Content package.json | ConvertFrom-Json; $clean = @{ name = $original.name; version = $original.version; main = 'dist/app.js'; scripts = @{ start = 'node dist/app.js' }; engines = $original.engines; dependencies = $original.dependencies }; $clean | ConvertTo-Json -Depth 10 | Set-Content package.json"
         
         echo Verifying package.json...
         type package.json

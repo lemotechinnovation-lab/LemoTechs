@@ -12,7 +12,7 @@ variables:
   nodeVersion: '20.x'
   
   # Azure connection and resources  
-  azureServiceConnection: 'Azure subscription 1'
+  azureServiceConnection: 'LemoTech-Azure-Connection'
   resourceGroupName: 'lemotech-platform'
   backendAppName: 'lemotech-api-backend'
 

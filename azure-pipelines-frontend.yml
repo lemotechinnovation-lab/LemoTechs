@@ -1,0 +1,46 @@
+# LemoTech Frontend Deployment Pipeline
+# Deploys React frontend to Azure Static Web Apps
+
+trigger:
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - frontend/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  nodeVersion: '20.x'
+
+stages:
+- stage: BuildAndDeploy
+  displayName: 'Build and Deploy Frontend'
+  jobs:
+  - job: DeployFrontend
+    displayName: 'Deploy LemoTech Frontend'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        cd frontend
+        echo "Installing frontend dependencies..."
+        npm ci
+        echo "Building React application..."
+        npm run build
+        echo "Frontend build completed!"
+      displayName: 'Build Frontend Application'
+    
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+        app_location: '/frontend'
+        output_location: 'dist'
+        skip_app_build: true
+      displayName: 'Deploy to Azure Static Web Apps'

@@ -68,9 +68,34 @@ stages:
         echo ... (showing sample files)
       displayName: 'Pre-Archive Verification'
     
+    - script: |
+        echo === Creating Oryx-compatible package ===
+        mkdir deploy-package
+        cd backend
+        
+        echo Copying and updating package.json...
+        copy package.json ..\deploy-package\
+        
+        echo Creating proper startup script...
+        cd ..\deploy-package
+        powershell -Command "(Get-Content package.json) -replace '\"start\": \".*\"', '\"start\": \"node dist/app.js\"' | Set-Content package.json"
+        
+        echo Copying built dist files...
+        cd ..\backend
+        xcopy /E /I dist ..\deploy-package\dist
+        
+        echo Copying essential files...
+        if exist web.config copy web.config ..\deploy-package\
+        if exist .deployment copy .deployment ..\deploy-package\
+        
+        echo Package structure:
+        cd ..\deploy-package
+        dir
+      displayName: 'Prepare Oryx-compatible Package'
+    
     - task: ArchiveFiles@2
       inputs:
-        rootFolderOrFile: 'backend'
+        rootFolderOrFile: 'deploy-package'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/$(packageName)-$(Build.BuildId).zip'
@@ -93,6 +118,12 @@ stages:
         echo ✅ Deployment package created: $(packageName)-$(Build.BuildId).zip
         echo ✅ Artifact published for deployment
       displayName: 'Build Summary'
+    
+    - script: |
+        echo === Cleanup ===
+        if exist deploy-package rmdir /s /q deploy-package
+        echo Temporary package directory cleaned up
+      displayName: 'Cleanup Build Artifacts'
 
 - stage: Deploy
   displayName: 'Deploy to Azure'

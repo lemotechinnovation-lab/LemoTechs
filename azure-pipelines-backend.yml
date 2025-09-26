@@ -1,0 +1,92 @@
+# LemoTech Backend Deployment Pipeline
+# Simplified pipeline for backend API deployment
+
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  nodeVersion: '20.x'
+  
+  # Azure connection and resources  
+  azureServiceConnection: 'Azure subscription 1'
+  resourceGroupName: 'lemotech-platform'
+  backendAppName: 'lemotech-api-backend'
+
+stages:
+- stage: Build
+  displayName: 'Build Backend'
+  jobs:
+  - job: BuildBackend
+    displayName: 'Build LemoTech Backend API'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        cd backend
+        echo "Installing dependencies..."
+        npm ci --production=false
+        echo "Running build..."
+        npm run build
+        echo "Build completed!"
+      displayName: 'Install Dependencies and Build'
+    
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: 'backend'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/lemotech-backend-$(Build.BuildId).zip'
+        replaceExistingArchive: true
+        verbose: true
+      displayName: 'Archive Backend Files'
+    
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/lemotech-backend-$(Build.BuildId).zip'
+        ArtifactName: 'backend-drop'
+        publishLocation: 'Container'
+      displayName: 'Publish Backend Artifact'
+
+- stage: Deploy
+  displayName: 'Deploy to Azure'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployBackend
+    displayName: 'Deploy LemoTech Backend'
+    environment: 'Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'backend-drop'
+              downloadPath: '$(Pipeline.Workspace)'
+            displayName: 'Download Backend Artifact'
+          
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              appType: 'webAppLinux'
+              appName: $(backendAppName)
+              resourceGroupName: $(resourceGroupName)
+              package: '$(Pipeline.Workspace)/backend-drop/lemotech-backend-$(Build.BuildId).zip'
+              runtimeStack: 'NODE|20-lts'
+              startUpCommand: 'npm start'
+            displayName: 'Deploy to Azure App Service'
+          
+          - script: |
+              echo "Backend deployed successfully!"
+              echo "API URL: https://$(backendAppName).azurewebsites.net"
+              echo "Health Check: https://$(backendAppName).azurewebsites.net/api/health"
+            displayName: 'Deployment Summary'

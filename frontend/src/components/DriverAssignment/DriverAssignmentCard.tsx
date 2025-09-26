@@ -245,7 +245,7 @@ const DriverInfoCard: React.FC<{
 };
 
 // Hook for managing driver location updates
-export const useDriverLocation = (driverId: string) => {
+export const useDriverLocation = (_driverId: string) => {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
@@ -295,7 +295,7 @@ export const useDriverLocation = (driverId: string) => {
 // Component for driver dashboard integration
 export const DriverAssignmentDashboard: React.FC<{
   driverId: string;
-}> = ({ driverId }) => {
+}> = ({ driverId: _driverId }) => {
   const [availableJobs, setAvailableJobs] = useState<any[]>([]);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 

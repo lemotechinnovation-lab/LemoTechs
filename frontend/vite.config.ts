@@ -32,7 +32,7 @@ export default defineConfig({
           'router': ['react-router-dom'],
           'animation': ['framer-motion'],
           'charts': ['recharts'],
-          'firebase': ['firebase'],
+          'firebase': ['firebase/app', 'firebase/auth'],
           'utils': ['use-places-autocomplete']
         },
       },

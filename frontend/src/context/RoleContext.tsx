@@ -155,7 +155,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         
         if (isAuthenticated && user) {
           // Try to get role from user object first
-          let userRole = user.role as UserRole;
+          let userRole = (user as any).role as UserRole;
           
           // If not in user object, try localStorage
           if (!userRole) {

@@ -1,0 +1,12 @@
+{
+  "name": "lemotech-api",
+  "version": "1.0.0",
+  "description": "LemoTech API for Azure Static Web Apps",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ../dist/app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -242,7 +242,7 @@ export class BookingService extends BaseService implements IBookingService {
     try {
       const result = await this.bookingRepository.update(bookingId, {
         driverId,
-        status: 'assigned',
+        status: 'confirmed',
         ...(this.bookingRepository as any).assignedAt && { assignedAt: new Date() } // Conditional property
       });
       

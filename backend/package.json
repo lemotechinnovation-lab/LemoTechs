@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "LemoTech API Backend - On-demand cleaning services",
   "main": "dist/app.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "start": "node deploy.js && node dist/app.js",
     "dev": "nodemon src/app.ts",

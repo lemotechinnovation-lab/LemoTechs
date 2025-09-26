@@ -31,7 +31,8 @@
     "db:legacy": "node-pg-migrate -m src/infrastructure/migrations",
     "db:legacy:create": "node-pg-migrate create -m src/infrastructure/migrations",
     "db:legacy:up": "node-pg-migrate up -m src/infrastructure/migrations",
-    "db:legacy:down": "node-pg-migrate down -m src/infrastructure/migrations"
+    "db:legacy:down": "node-pg-migrate down -m src/infrastructure/migrations",
+    "postinstall": "npm run build"
   },
   "keywords": [],
   "author": "",

@@ -8,7 +8,7 @@
     "dev": "nodemon src/app.ts",
     "dev:debug": "nodemon --exec \"node --inspect-brk -r ts-node/register\" src/app.ts",
     "debug": "node --inspect-brk ./node_modules/.bin/ts-node src/app.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.prod.json",
     "build:watch": "tsc --watch",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
@@ -32,7 +32,7 @@
     "db:legacy:create": "node-pg-migrate create -m src/infrastructure/migrations",
     "db:legacy:up": "node-pg-migrate up -m src/infrastructure/migrations",
     "db:legacy:down": "node-pg-migrate down -m src/infrastructure/migrations",
-    "postinstall": "npm run build"
+    "postinstall": "tsc -p tsconfig.prod.json"
   },
   "keywords": [],
   "author": "",
@@ -66,9 +66,7 @@
     "twilio": "^5.9.0",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
-    "typescript": "^5.9.2"
-  },
-  "devDependencies": {
+    "typescript": "^5.9.2",
     "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
@@ -79,7 +77,9 @@
     "@types/node-fetch": "^2.6.13",
     "@types/nodemailer": "^7.0.1",
     "@types/pg": "^8.15.5",
-    "@types/uuid": "^10.0.0",
+    "@types/uuid": "^10.0.0"
+  },
+  "devDependencies": {
     "node-pg-migrate": "^8.0.3",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2"

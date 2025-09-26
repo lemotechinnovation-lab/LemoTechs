@@ -23,6 +23,7 @@ import shopQueueRoutes from './routes/shopQueueRoutes';
 import shopInventoryTrackingRoutes from './routes/shopInventoryTrackingRoutes';
 import routeOptimizationRoutes from './routes/routeOptimizationRoutes';
 import shopManagementRoutes from './routes/shopManagementRoutes';
+import swaggerRoutes from './routes/swagger';
 
 // Import utilities
 import { testConnection, initDatabase } from './infrastructure';
@@ -93,6 +94,26 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Welcome endpoint with API overview
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Welcome to LemoTech API',
+    version: '1.0.0',
+    documentation: `${req.protocol}://${req.get('host')}/api-docs`,
+    endpoints: {
+      authentication: '/api/auth',
+      bookings: '/api/bookings',
+      drivers: '/api/drivers',
+      shops: '/api/shops',
+      payments: '/api/payfast',
+      admin: '/api/admin',
+      documentation: '/api-docs'
+    },
+    health: `${req.protocol}://${req.get('host')}/health`
+  });
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -109,6 +130,9 @@ app.use('/api/shop-queue', shopQueueRoutes); // Shop queue management routes
 app.use('/api/shop-inventory', shopInventoryTrackingRoutes); // Shop inventory tracking routes
 app.use('/api/route-optimization', routeOptimizationRoutes); // Route optimization routes
 app.use('/api/shop-management', shopManagementRoutes); // Shop management routes
+
+// API Documentation
+app.use('/api-docs', swaggerRoutes); // Swagger API documentation
 
 // PayFast payment result pages
 app.get('/payment/success', (req, res) => {

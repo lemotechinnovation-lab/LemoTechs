@@ -13,9 +13,9 @@ variables:
   buildConfiguration: 'Release'
   nodeVersion: '20.x'
   
-  # Azure connection and resources (configure these in Azure DevOps)
+  # Azure connection and resources (updated based on current setup)
   azureServiceConnection: 'LemoTech-Azure-Connection'
-  resourceGroupName: 'Default-Web-EastUS'
+  resourceGroupName: 'lemotech-platform'
   backendAppName: 'lemotech-api-backend'
   
   # Deployment settings
@@ -133,31 +133,105 @@ stages:
               deploymentMethod: 'zipDeploy'
             displayName: 'Deploy to Azure App Service'
           
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "=== Configuring App Service Environment ==="
+                
+                # Set essential environment variables
+                az webapp config appsettings set \
+                  --resource-group $(resourceGroupName) \
+                  --name $(backendAppName) \
+                  --settings \
+                    NODE_ENV="production" \
+                    PORT="8000" \
+                    DATABASE_URL="postgresql://lemotech_admin:SecureDB2024!Platform@lemotech-db-server.postgres.database.azure.com:5432/lemotech_innovations?sslmode=require" \
+                    JWT_SECRET="LemoTech2024!SecureJWT!Production!Key!9x8v7c6b5n4m3" \
+                    CORS_ORIGIN="*" \
+                    AUTO_MIGRATE="true" \
+                    SEED_TEST_DATA="false"
+                
+                echo "✅ Environment variables configured"
+                
+                # Verify Service Connector status
+                echo "=== Verifying Service Connector ==="
+                az webapp connection list \
+                  --resource-group $(resourceGroupName) \
+                  --name $(backendAppName) \
+                  --query "[].{Name:name, Status:provisioningState, Target:targetService.id}" \
+                  --output table
+                
+                echo "✅ Service connector verification completed"
+                
+                # Restart app to apply new configuration
+                echo "=== Restarting App Service ==="
+                az webapp restart \
+                  --resource-group $(resourceGroupName) \
+                  --name $(backendAppName)
+                
+                echo "✅ App service restarted"
+            displayName: 'Configure Environment & Verify Service Connector'
+          
           - script: |
               echo "=== Post-Deployment Health Check ==="
-              echo "Waiting 30 seconds for service startup..."
-              sleep 30
+              echo "Waiting 45 seconds for service startup and configuration..."
+              sleep 45
               
               echo "Testing backend health..."
-              for i in {1..10}; do
-                echo "Health check attempt $i/10..."
-                if curl -f -s -o /dev/null "https://$(backendAppName).azurewebsites.net"; then
-                  echo "✅ Backend is responding!"
+              APP_URL="https://$(backendAppName).azurewebsites.net"
+              
+              for i in {1..12}; do
+                echo "Health check attempt $i/12..."
+                
+                # Test basic connectivity
+                if curl -f -s -o /dev/null -w "%{http_code}" "$APP_URL" | grep -q "200"; then
+                  echo "✅ Backend is responding with HTTP 200!"
+                  
+                  # Test specific endpoints if available
+                  echo "Testing API endpoints..."
+                  if curl -f -s -o /dev/null "$APP_URL/health" 2>/dev/null; then
+                    echo "✅ Health endpoint responding"
+                  fi
+                  
+                  if curl -f -s -o /dev/null "$APP_URL/api-docs" 2>/dev/null; then
+                    echo "✅ API docs endpoint responding"
+                  fi
+                  
                   break
-                elif [ $i -eq 10 ]; then
-                  echo "⚠️ Backend may still be starting up"
+                elif [ $i -eq 12 ]; then
+                  echo "⚠️ Backend may still be starting up or have configuration issues"
+                  echo "Check logs at: https://$(backendAppName).scm.azurewebsites.net/api/logs/docker"
                 else
-                  echo "Still starting up, waiting 15 seconds..."
+                  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL" 2>/dev/null || echo "000")
+                  echo "HTTP Status: $HTTP_CODE - Still starting up, waiting 15 seconds..."
                   sleep 15
                 fi
               done
-            displayName: 'Health Check'
+            displayName: 'Enhanced Health Check'
           
           - script: |
               echo "=== Deployment Completed Successfully ==="
+              echo ""
               echo "🌐 Backend API: https://$(backendAppName).azurewebsites.net"
               echo "📚 API Documentation: https://$(backendAppName).azurewebsites.net/api-docs"
               echo "🔍 Health Check: https://$(backendAppName).azurewebsites.net/health"
               echo "⚙️ Kudu Console: https://$(backendAppName).scm.azurewebsites.net"
               echo "📋 Deployment Logs: https://$(backendAppName).scm.azurewebsites.net/api/deployments"
+              echo "📊 App Insights: https://portal.azure.com/#@/resource/subscriptions/9aeef90e-7413-4841-bc9b-a4e7410709a4/resourceGroups/$(resourceGroupName)/providers/Microsoft.Web/sites/$(backendAppName)/appInsights"
+              echo ""
+              echo "🔗 Service Connections:"
+              echo "  ├── PostgreSQL: lemotech-db-server.postgres.database.azure.com"
+              echo "  ├── Database: lemotech_innovations"
+              echo "  └── SSL: Enabled"
+              echo ""
+              echo "⚙️ Configuration:"
+              echo "  ├── Node.js: 20-lts"
+              echo "  ├── Runtime: Linux"
+              echo "  ├── Service Connection: $(azureServiceConnection)"
+              echo "  └── Resource Group: $(resourceGroupName)"
+              echo ""
+              echo "✅ Backend deployment completed successfully!"
             displayName: 'Deployment Summary'

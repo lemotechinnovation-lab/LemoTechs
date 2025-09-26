@@ -78,7 +78,10 @@ stages:
         
         echo Creating proper startup script...
         cd ..\deploy-package
-        powershell -Command "(Get-Content package.json) -replace '\"start\": \".*\"', '\"start\": \"node dist/app.js\"' | Set-Content package.json"
+        powershell -Command "(Get-Content package.json) -replace '\"postinstall\": \".*\",?', '' -replace '\"start\": \".*\"', '\"start\": \"node dist/app.js\"' | Set-Content package.json"
+        
+        echo Verifying package.json...
+        type package.json
         
         echo Installing production dependencies...
         npm install --production --legacy-peer-deps

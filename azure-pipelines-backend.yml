@@ -35,37 +35,37 @@ stages:
       displayName: 'Install Node.js $(nodeVersion)'
     
     - script: |
-        echo "=== LemoTech Backend Build Process ==="
+        echo === LemoTech Backend Build Process ===
         cd backend
-        echo "Current directory: $(pwd)"
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
+        echo Current directory: %CD%
+        node --version
+        npm --version
         
-        echo "Installing dependencies..."
-        npm ci --production=false --legacy-peer-deps
+        echo Installing dependencies...
+        npm install --legacy-peer-deps
         
-        echo "Running TypeScript build..."
+        echo Running TypeScript build...
         npm run build
         
-        echo "Verifying build output..."
-        if [ -d "dist" ]; then
-          echo "✅ Build successful - dist directory created"
-          ls -la dist/
-        else
-          echo "❌ Build failed - dist directory not found"
+        echo Verifying build output...
+        if exist "dist" (
+          echo ✅ Build successful - dist directory created
+          dir dist
+        ) else (
+          echo ❌ Build failed - dist directory not found
           exit 1
-        fi
+        )
         
-        echo "Build completed successfully!"
+        echo Build completed successfully!
       displayName: 'Install Dependencies and Build'
     
     - script: |
-        echo "=== Creating Deployment Package ==="
+        echo === Creating Deployment Package ===
         cd backend
-        echo "Excluding node_modules, logs, and temp files..."
-        echo "Package contents:"
-        find . -name "node_modules" -prune -o -name "*.log" -prune -o -type f -print | head -20
-        echo "... (showing first 20 files)"
+        echo Excluding node_modules, logs, and temp files...
+        echo Package contents:
+        dir /s /b | findstr /v node_modules | findstr /v "\.log" | more
+        echo ... (showing sample files)
       displayName: 'Pre-Archive Verification'
     
     - task: ArchiveFiles@2
@@ -86,12 +86,12 @@ stages:
       displayName: 'Publish Backend Artifact'
     
     - script: |
-        echo "=== Build Stage Summary ==="
-        echo "✅ Node.js $(nodeVersion) installed"
-        echo "✅ Dependencies installed with --legacy-peer-deps"
-        echo "✅ TypeScript build completed"
-        echo "✅ Deployment package created: $(packageName)-$(Build.BuildId).zip"
-        echo "✅ Artifact published for deployment"
+        echo === Build Stage Summary ===
+        echo ✅ Node.js $(nodeVersion) installed
+        echo ✅ Dependencies installed with --legacy-peer-deps
+        echo ✅ TypeScript build completed
+        echo ✅ Deployment package created: $(packageName)-$(Build.BuildId).zip
+        echo ✅ Artifact published for deployment
       displayName: 'Build Summary'
 
 - stage: Deploy
@@ -115,10 +115,10 @@ stages:
             displayName: 'Download Backend Artifact'
           
           - script: |
-              echo "=== Pre-Deployment Verification ==="
-              echo "Artifact location: $(Pipeline.Workspace)/backend-drop/"
-              ls -la "$(Pipeline.Workspace)/backend-drop/"
-              echo "Package to deploy: $(packageName)-$(Build.BuildId).zip"
+              echo === Pre-Deployment Verification ===
+              echo Artifact location: $(Pipeline.Workspace)\backend-drop\
+              dir "$(Pipeline.Workspace)\backend-drop\"
+              echo Package to deploy: $(packageName)-$(Build.BuildId).zip
             displayName: 'Pre-Deployment Check'
           
           - task: AzureWebApp@1
@@ -213,25 +213,25 @@ stages:
             displayName: 'Enhanced Health Check'
           
           - script: |
-              echo "=== Deployment Completed Successfully ==="
-              echo ""
-              echo "🌐 Backend API: https://$(backendAppName).azurewebsites.net"
-              echo "📚 API Documentation: https://$(backendAppName).azurewebsites.net/api-docs"
-              echo "🔍 Health Check: https://$(backendAppName).azurewebsites.net/health"
-              echo "⚙️ Kudu Console: https://$(backendAppName).scm.azurewebsites.net"
-              echo "📋 Deployment Logs: https://$(backendAppName).scm.azurewebsites.net/api/deployments"
-              echo "📊 App Insights: https://portal.azure.com/#@/resource/subscriptions/9aeef90e-7413-4841-bc9b-a4e7410709a4/resourceGroups/$(resourceGroupName)/providers/Microsoft.Web/sites/$(backendAppName)/appInsights"
-              echo ""
-              echo "🔗 Service Connections:"
-              echo "  ├── PostgreSQL: lemotech-db-server.postgres.database.azure.com"
-              echo "  ├── Database: lemotech_innovations"
-              echo "  └── SSL: Enabled"
-              echo ""
-              echo "⚙️ Configuration:"
-              echo "  ├── Node.js: 20-lts"
-              echo "  ├── Runtime: Linux"
-              echo "  ├── Service Connection: $(azureServiceConnection)"
-              echo "  └── Resource Group: $(resourceGroupName)"
-              echo ""
-              echo "✅ Backend deployment completed successfully!"
+              echo === Deployment Completed Successfully ===
+              echo.
+              echo 🌐 Backend API: https://$(backendAppName).azurewebsites.net
+              echo 📚 API Documentation: https://$(backendAppName).azurewebsites.net/api-docs
+              echo 🔍 Health Check: https://$(backendAppName).azurewebsites.net/health
+              echo ⚙️ Kudu Console: https://$(backendAppName).scm.azurewebsites.net
+              echo 📋 Deployment Logs: https://$(backendAppName).scm.azurewebsites.net/api/deployments
+              echo 📊 App Insights: https://portal.azure.com/#@/resource/subscriptions/9aeef90e-7413-4841-bc9b-a4e7410709a4/resourceGroups/$(resourceGroupName)/providers/Microsoft.Web/sites/$(backendAppName)/appInsights
+              echo.
+              echo 🔗 Service Connections:
+              echo   PostgreSQL: lemotech-db-server.postgres.database.azure.com
+              echo   Database: lemotech_innovations
+              echo   SSL: Enabled
+              echo.
+              echo ⚙️ Configuration:
+              echo   Node.js: 20-lts
+              echo   Runtime: Linux
+              echo   Service Connection: $(azureServiceConnection)
+              echo   Resource Group: $(resourceGroupName)
+              echo.
+              echo ✅ Backend deployment completed successfully!
             displayName: 'Deployment Summary'

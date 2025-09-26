@@ -1,0 +1,13 @@
+{
+  "migrations": {
+    "directory": "src/infrastructure/migrations",
+    "table": "pgmigrations"
+  },
+  "db": {
+    "host": "localhost",
+    "port": 5435,
+    "database": "lemotech_innovations",
+    "user": "postgres",
+    "password": "postgres"
+  }
+}

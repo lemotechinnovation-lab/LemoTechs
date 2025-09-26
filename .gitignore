@@ -1,0 +1,158 @@
+# LemoTech Platform .gitignore
+
+# ===========================================
+# DOT FILES (files starting with .)
+# ===========================================
+.*
+!.gitignore
+# GitHub files not needed (using Azure DevOps)
+!.vscode/settings.json
+!.eslintrc.*
+!.prettierrc.*
+
+# ===========================================
+# DEPENDENCIES
+# ===========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# ===========================================
+# ENVIRONMENT VARIABLES
+# ===========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+
+# ===========================================
+# BUILD OUTPUTS
+# ===========================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist/
+
+# ===========================================
+# LOGS
+# ===========================================
+logs/
+*.log
+*.log.*
+loglevel.txt
+
+# ===========================================
+# RUNTIME DATA
+# ===========================================
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ===========================================
+# COVERAGE DIRECTORY
+# ===========================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ===========================================
+# TEMP/CACHE DIRECTORIES
+# ===========================================
+.tmp/
+.cache/
+.sass-cache/
+.parcel-cache/
+.vite/
+
+# ===========================================
+# DATABASE
+# ===========================================
+*.sqlite
+*.sqlite3
+*.db
+database.json
+migrations/temp/
+
+# ===========================================
+# IDE/EDITOR FILES
+# ===========================================
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ===========================================
+# OS GENERATED FILES
+# ===========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===========================================
+# SECURITY & KEYS
+# ===========================================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+firebase-service-account.json
+service-account-key.json
+
+# ===========================================
+# UPLOADS & USER CONTENT
+# ===========================================
+uploads/
+temp/
+public/uploads/
+
+# ===========================================
+# AZURE & CLOUD
+# ===========================================
+.azure/
+azure-pipelines.yml.bak
+
+# ===========================================
+# MOBILE (React Native/Expo)
+# ===========================================
+.expo/
+.expo-shared/
+*.orig.*
+web-build/
+
+# ===========================================
+# TESTING
+# ===========================================
+.nyc_output/
+coverage/
+*.coverage
+.pytest_cache/
+test-results/
+
+# ===========================================
+# MISC
+# ===========================================
+*.tgz
+*.tar.gz
+.npm
+.eslintcache
+.stylelintcache

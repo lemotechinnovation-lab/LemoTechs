@@ -1,0 +1,163 @@
+parameters:
+  environment: ''
+  sshHost: ''
+  sshPort: ''
+  siteUrl: ''
+
+jobs:
+  - deployment: Deploy
+    environment: ${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - download: current
+              artifact: drop
+            
+            - task: ExtractFiles@1
+              inputs:
+                archiveFilePatterns: '$(Pipeline.Workspace)/drop/site.tar.gz'
+                destinationFolder: '$(Pipeline.Workspace)/drop/extracted'
+                cleanDestinationFolder: true
+              displayName: 'Extract Files'
+
+            # Download the SSH private key from secure files
+            - task: DownloadSecureFile@1
+              name: sshKey
+              inputs:
+                secureFile: 'cpanel_ssh_access'
+              displayName: 'Download SSH Key'
+
+            # Configure SSH and test connection
+            # Configure SSH and test connection
+            - task: Bash@3
+              inputs:
+                targetType: 'inline'
+                script: |
+                  set -x  # Enable command tracing
+                  
+                  echo "==> Configuring SSH key and permissions"
+                  echo "SSH key path: $(sshKey.secureFilePath)"
+                  
+                  # Check if SSH key file exists and set permissions
+                  # Check if SSH key file exists and set permissions
+                  if [ ! -f "$(sshKey.secureFilePath)" ]; then
+                    echo "##[error]SSH key file not found at $(sshKey.secureFilePath)"
+                    exit 1
+                  fi
+                  
+                  chmod 600 "$(sshKey.secureFilePath)" || {
+                    echo "##[error]Failed to set permissions on SSH key"
+                    exit 1
+                  }
+                  
+                  # Test SSH connection
+                  echo "==> Testing SSH connection to ${{ parameters.sshHost }}:${{ parameters.sshPort }}"
+                  if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p ${{ parameters.sshPort }} -i "$(sshKey.secureFilePath)" lemotec1@${{ parameters.sshHost }} "echo '✅ Connected to cPanel'"; then
+                    echo "##[section]SSH Connection Test Successful!"
+                  else
+                    echo "##[error]SSH connection test failed"
+                    exit 1
+                  fi
+              displayName: 'Configure SSH'
+              displayName: 'Configure SSH'
+
+            # Deploy files using SCP
+            - task: Bash@3
+              inputs:
+                targetType: 'inline'
+                script: |
+                  # Set variables
+                  SSH_HOST="${{ parameters.sshHost }}"
+                  SSH_USER="lemotec1"
+                  SSH_PORT="${{ parameters.sshPort }}"
+                  SSH_KEY="$(sshKey.secureFilePath)"
+                  LOCAL_PATH="$(Pipeline.Workspace)/drop/extracted"
+                  BASE_PATH="/home/lemotec1/public_html"
+                  
+                  # Set environment-specific variables
+                  case "${{ parameters.environment }}" in
+                    "QA")
+                      REMOTE_PATH="$BASE_PATH/qa"
+                      ;;
+                    "Staging")
+                      REMOTE_PATH="$BASE_PATH/staging"
+                      ;;
+                    "Production")
+                      REMOTE_PATH="$BASE_PATH"  # Production is in the root public_html
+                      ;;
+                    *)
+                      echo "##[error]Unknown environment: ${{ parameters.environment }}"
+                      exit 1
+                      ;;
+                  esac
+                  
+                  echo "==> Deployment Configuration"
+                  echo "Host: $SSH_HOST"
+                  echo "Port: $SSH_PORT"
+                  echo "User: $SSH_USER"
+                  echo "Local Path: $LOCAL_PATH"
+                  echo "Remote Path: $REMOTE_PATH"
+                  echo "Environment: ${{ parameters.environment }}"
+                  
+                  # Create backup of existing files
+                  echo "==> Creating backup of $REMOTE_PATH"
+                  BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_PATH="${REMOTE_PATH}_backup_${BACKUP_DATE}"
+                  ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "cp -r $REMOTE_PATH $BACKUP_PATH" || {
+                  ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "cp -r $REMOTE_PATH $BACKUP_PATH" || {
+                    echo "##[warning]Backup creation failed, continuing with deployment"
+                  }
+                  
+                  # Ensure the remote directory exists
+                  echo "==> Creating remote directory $REMOTE_PATH"
+                  ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "mkdir -p $REMOTE_PATH"
+                  
+                  # Upload files using SCP
+                  echo "==> Uploading files via SCP to $REMOTE_PATH"
+                  scp -o StrictHostKeyChecking=no -P "$SSH_PORT" -i "$SSH_KEY" -r "$LOCAL_PATH"/* "$SSH_USER@$SSH_HOST:$REMOTE_PATH/" || {
+                    echo "##[error]File upload failed"
+                    exit 1
+                  }
+                  
+                  # Set permissions
+                  echo "==> Setting file permissions in $REMOTE_PATH"
+                  ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "chmod -R 755 $REMOTE_PATH; find $REMOTE_PATH -type f -exec chmod 644 {} \;"
+                  
+                  # Verify deployment
+                  echo "==> Verifying site accessibility"
+                  SITE_URL="${{ parameters.siteUrl }}"
+                  
+                  # Remove protocol if present
+                  SITE_URL=${SITE_URL#http://}
+                  SITE_URL=${SITE_URL#https://}
+                  
+                  echo "==> Testing connection to: $SITE_URL"
+                  
+                  MAX_RETRIES=3
+                  RETRY_DELAY=10
+                  
+                  for i in $(seq 1 $MAX_RETRIES); do
+                      echo "==> Verification attempt $i of $MAX_RETRIES"
+                      if curl -sSf -o /dev/null --connect-timeout 30 --max-time 60 "https://$SITE_URL"; then
+                          echo "##[section]Site verification successful"
+                          break
+                      elif [ $i -eq $MAX_RETRIES ]; then
+                          echo "##[warning]Site verification failed after $MAX_RETRIES attempts"
+                          echo "Deployment completed but site verification failed. Please check manually."
+                      else
+                          echo "Verification failed, waiting $RETRY_DELAY seconds before retry..."
+                          sleep $RETRY_DELAY
+                      fi
+                  done
+              displayName: 'Deploy via SCP'
+
+            # Cleanup
+            - task: Bash@3
+              inputs:
+                targetType: 'inline'
+                script: |
+                  echo "==> Cleaning up temporary files"
+                  rm -rf "$(Pipeline.Workspace)/drop/extracted"
+                  rm -f "$(sshKey.secureFilePath)"
+              displayName: 'Cleanup' 

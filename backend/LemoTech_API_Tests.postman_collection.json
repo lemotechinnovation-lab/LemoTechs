@@ -1,0 +1,1507 @@
+{
+  "info": {
+    "name": "LemoTech Backend API Tests",
+    "description": "Comprehensive test collection for all LemoTech backend API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "shopId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driverId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "itemId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "feedbackId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Health check returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success field', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"leo@lemotech.test\",\n  \"password\": \"TestPassword123!\",\n  \"name\": \"Leo Test User\",\n  \"phone\": \"+15550000001\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Registration successful', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response contains user data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('user');",
+                  "    pm.expect(jsonData.data).to.have.property('token');",
+                  "    ",
+                  "    // Store token and user ID for later use",
+                  "    pm.collectionVariables.set('authToken', jsonData.data.token);",
+                  "    pm.collectionVariables.set('userId', jsonData.data.user.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"leo@lemotech.test\",\n  \"password\": \"TestPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains token', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('token');",
+                  "    ",
+                  "    // Store token for authenticated requests",
+                  "    pm.collectionVariables.set('authToken', jsonData.data.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "profile"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Profile retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains user profile', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"123 Test Street, City\",\n  \"pickupCoords\": {\n    \"lat\": 40.7128,\n    \"lng\": -74.0060\n  },\n  \"items\": [\n    {\n      \"name\": \"White Sneakers\",\n      \"quantity\": 2,\n      \"price\": 25.00\n    }\n  ],\n  \"paymentMethod\": \"card\",\n  \"amount\": 50.00,\n  \"contactPhone\": \"+15550000001\",\n  \"specialInstructions\": \"Handle with care\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Booking created successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response contains booking data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    ",
+                  "    // Store booking ID for later use",
+                  "    pm.collectionVariables.set('bookingId', jsonData.data.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get User Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Bookings retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains bookings array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Booking retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains booking details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Service Items",
+      "item": [
+        {
+          "name": "Get Service Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/service-items",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "service-items"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Service items retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains service items array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "    pm.expect(jsonData.data.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "File Uploads",
+      "item": [
+        {
+          "name": "Upload Single File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/uploads/single",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "uploads", "single"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('File uploaded successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains file data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "    pm.expect(jsonData.data).to.have.property('url');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shop Queue Management",
+      "item": [
+        {
+          "name": "Add Item to Queue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shopId\": \"{{shopId}}\",\n  \"bookingId\": \"{{bookingId}}\",\n  \"cleaningItemId\": \"item-id\",\n  \"priority\": \"high\",\n  \"estimatedDuration\": 60,\n  \"notes\": \"Handle with care\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shop-queue/queue/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shop-queue", "queue", "add"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Item added to queue successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Queue Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/shop-queue/queue/status/{{shopId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shop-queue", "queue", "status", "{{shopId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Queue status retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shop Inventory Tracking",
+      "item": [
+        {
+          "name": "Add Inventory Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemName\": \"Eco-Friendly Detergent\",\n  \"category\": \"cleaning_supplies\",\n  \"quantity\": 100,\n  \"minQuantity\": 20,\n  \"maxQuantity\": 200,\n  \"unitPrice\": 15.50,\n  \"costPrice\": 10.00,\n  \"supplier\": \"Green Clean Supplies\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shop-inventory/inventory/{{shopId}}/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shop-inventory", "inventory", "{{shopId}}", "add"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Inventory item added successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Inventory Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/shop-inventory/inventory/{{shopId}}/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shop-inventory", "inventory", "{{shopId}}", "dashboard"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Inventory dashboard retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Route Optimization",
+      "item": [
+        {
+          "name": "Optimize Route",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverId}}\",\n  \"pickupLocations\": [\n    {\n      \"lat\": 40.7128,\n      \"lng\": -74.0060,\n      \"address\": \"123 Test St\"\n    }\n  ],\n  \"deliveryLocations\": [\n    {\n      \"lat\": 40.7589,\n      \"lng\": -73.9851,\n      \"address\": \"456 Delivery Ave\"\n    }\n  ],\n  \"algorithm\": \"nearest_neighbor\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/route-optimization/optimize",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "route-optimization", "optimize"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Route optimized successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleaning Workflow",
+      "item": [
+        {
+          "name": "Create Items from Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"items\": [\n    {\n      \"name\": \"White Sneakers\",\n      \"type\": \"shoes\",\n      \"condition\": \"good\",\n      \"cleaningMethod\": \"wash\",\n      \"estimatedTime\": 60\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/cleaning/items/from-booking",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cleaning", "items", "from-booking"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Items created from booking successfully', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PayFast Payments",
+      "item": [
+        {
+          "name": "Create Payment Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50.00,\n  \"itemName\": \"Cleaning Service\",\n  \"itemDescription\": \"Professional cleaning service\",\n  \"returnUrl\": \"{{baseUrl}}/payment/success\",\n  \"cancelUrl\": \"{{baseUrl}}/payment/cancel\",\n  \"customerEmail\": \"customer@example.com\",\n  \"customerName\": \"John Doe\",\n  \"customerPhone\": \"+27821234567\",\n  \"metadata\": {\n    \"bookingId\": \"booking123\",\n    \"serviceType\": \"cleaning\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/create-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "create-payment"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment request created successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/verify/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "verify", "{{transactionId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment status verified successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PayFast Webhook Notification (ITN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "m_payment_id",
+                  "value": "lemotech_1234567890_user123",
+                  "type": "text"
+                },
+                {
+                  "key": "pf_payment_id",
+                  "value": "1234567890",
+                  "type": "text"
+                },
+                {
+                  "key": "payment_status",
+                  "value": "COMPLETE",
+                  "type": "text"
+                },
+                {
+                  "key": "item_name",
+                  "value": "LemoTech Cleaning Service",
+                  "type": "text"
+                },
+                {
+                  "key": "item_description",
+                  "value": "Professional cleaning service",
+                  "type": "text"
+                },
+                {
+                  "key": "amount_gross",
+                  "value": "50.00",
+                  "type": "text"
+                },
+                {
+                  "key": "amount_fee",
+                  "value": "-1.75",
+                  "type": "text"
+                },
+                {
+                  "key": "amount_net",
+                  "value": "48.25",
+                  "type": "text"
+                },
+                {
+                  "key": "custom_str1",
+                  "value": "user123",
+                  "type": "text"
+                },
+                {
+                  "key": "name_first",
+                  "value": "John",
+                  "type": "text"
+                },
+                {
+                  "key": "name_last",
+                  "value": "Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "email_address",
+                  "value": "john.doe@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "merchant_id",
+                  "value": "10042081",
+                  "type": "text"
+                },
+                {
+                  "key": "signature",
+                  "value": "generated_signature_hash",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/notify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "notify"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Webhook notification processed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Process Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 25.00,\n  \"reason\": \"Customer requested refund due to service issue\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/refund/{{transactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "refund", "{{transactionId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Refund processed successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Payment History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/history?limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment history retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Payment Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payfast/statistics?period=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payfast", "statistics"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Payment statistics retrieved successfully', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shop Management",
+      "item": [
+        {
+          "name": "Order Management",
+          "item": [
+            {
+              "name": "Get Live Order Queue",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/queue?status=pending&priority=all",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "queue"],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    },
+                    {
+                      "key": "priority",
+                      "value": "all"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Order Processing Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/{{orderId}}/status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "{{orderId}}", "status"]
+                }
+              }
+            },
+            {
+              "name": "Update Order Priority",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"priority\": \"high\",\n  \"reason\": \"VIP customer request\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/{{orderId}}/priority",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "{{orderId}}", "priority"]
+                }
+              }
+            },
+            {
+              "name": "Search Orders",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"customer name\",\n  \"filters\": {\n    \"status\": \"pending\",\n    \"priority\": \"high\"\n  },\n  \"sortBy\": \"createdAt\",\n  \"sortOrder\": \"desc\",\n  \"limit\": 20,\n  \"offset\": 0\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/search",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "search"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Item Processing",
+          "item": [
+            {
+              "name": "Confirm Item Receipt",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"itemId\": \"item-uuid\",\n      \"condition\": \"good\",\n      \"notes\": \"Item received in good condition\"\n    }\n  ],\n  \"receiptNotes\": \"All items received successfully\",\n  \"receivedBy\": \"staff-member-name\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/{{orderId}}/receipt",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "{{orderId}}", "receipt"]
+                }
+              }
+            },
+            {
+              "name": "Assess Item Condition",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"condition\": \"good\",\n  \"photos\": [\"photo1.jpg\", \"photo2.jpg\"],\n  \"notes\": \"Minor stain on sleeve\",\n  \"specialRequirements\": [\"gentle_cycle\", \"air_dry\"],\n  \"assessedBy\": \"staff-member-name\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/items/{{itemId}}/assessment",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "items", "{{itemId}}", "assessment"]
+                }
+              }
+            },
+            {
+              "name": "Update Cleaning Progress",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\",\n  \"progress\": 75,\n  \"notes\": \"Cleaning process 75% complete\",\n  \"photos\": [\"progress1.jpg\"],\n  \"updatedBy\": \"staff-member-name\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/items/{{itemId}}/progress",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "items", "{{itemId}}", "progress"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Staff Management",
+          "item": [
+            {
+              "name": "Get Staff Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/staff/dashboard",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "staff", "dashboard"]
+                }
+              }
+            },
+            {
+              "name": "Assign Staff to Job",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"staffId\": \"staff-uuid\",\n  \"assignmentNotes\": \"Assigned to experienced cleaner for delicate items\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/staff/{{jobId}}/assign",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "staff", "{{jobId}}", "assign"]
+                }
+              }
+            },
+            {
+              "name": "Get Workload Distribution",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/staff/workload",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "staff", "workload"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventory Management",
+          "item": [
+            {
+              "name": "Get Supply Tracking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/supplies/tracking",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "supplies", "tracking"]
+                }
+              }
+            },
+            {
+              "name": "Update Supply Levels",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"supplies\": [\n    {\n      \"itemId\": \"detergent-001\",\n      \"currentLevel\": 50,\n      \"unit\": \"liters\"\n    },\n    {\n      \"itemId\": \"fabric-softener-001\",\n      \"currentLevel\": 25,\n      \"unit\": \"liters\"\n    }\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/supplies/levels",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "supplies", "levels"]
+                }
+              }
+            },
+            {
+              "name": "Get Low Stock Alerts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/supplies/low-stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "supplies", "low-stock"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Communication",
+          "item": [
+            {
+              "name": "Send Customer Status Update",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"in_progress\",\n  \"message\": \"Your items are currently being cleaned. Expected completion in 2 hours.\",\n  \"photos\": [\"progress1.jpg\"],\n  \"estimatedCompletionTime\": \"2024-01-15T16:00:00Z\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/{{orderId}}/customer-update",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "{{orderId}}", "customer-update"]
+                }
+              }
+            },
+            {
+              "name": "Send Message to Customer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"We found a small stain that requires special treatment. This may add 30 minutes to the process. Is that okay?\",\n  \"attachments\": [\"stain_photo.jpg\"]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/orders/{{orderId}}/messages",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "orders", "{{orderId}}", "messages"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Financial Management",
+          "item": [
+            {
+              "name": "Get Daily Earnings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/finance/daily-earnings?date=2024-01-15",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "finance", "daily-earnings"],
+                  "query": [
+                    {
+                      "key": "date",
+                      "value": "2024-01-15"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Commission Tracking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/finance/commission?period=30",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "finance", "commission"],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "30"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analytics & Reporting",
+          "item": [
+            {
+              "name": "Get Performance Metrics",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/analytics/performance?period=30",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "analytics", "performance"],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "30"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Customer Satisfaction",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/analytics/satisfaction?period=30",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "analytics", "satisfaction"],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "30"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Peak Hours Analysis",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/analytics/peak-hours?period=30",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "analytics", "peak-hours"],
+                  "query": [
+                    {
+                      "key": "period",
+                      "value": "30"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quality Assurance",
+          "item": [
+            {
+              "name": "Get Quality Checklist",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/quality/checklist?itemType=shirt",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "quality", "checklist"],
+                  "query": [
+                    {
+                      "key": "itemType",
+                      "value": "shirt"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Customer Feedback",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/quality/feedback?rating=5&limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "quality", "feedback"],
+                  "query": [
+                    {
+                      "key": "rating",
+                      "value": "5"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Respond to Customer Feedback",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"response\": \"Thank you for your feedback! We're glad you were satisfied with our service.\",\n  \"responseType\": \"acknowledgment\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/shop-management/quality/feedback/{{feedbackId}}/respond",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "shop-management", "quality", "feedback", "{{feedbackId}}", "respond"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

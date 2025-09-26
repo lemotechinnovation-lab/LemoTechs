@@ -1,0 +1,112 @@
+/* Standardized Card Sizing System */
+
+/* Base card sizing based on title text size */
+.card-size-small {
+  min-height: 180px;
+  max-height: 220px;
+}
+
+.card-size-medium {
+  min-height: 240px;
+  max-height: 280px;
+}
+
+.card-size-large {
+  min-height: 320px;
+  max-height: 380px;
+}
+
+.card-size-xl {
+  min-height: 400px;
+  max-height: 480px;
+}
+
+/* Fixed height cards for consistent grid layouts */
+.card-fixed-small {
+  height: 200px;
+}
+
+.card-fixed-medium {
+  height: 260px;
+}
+
+.card-fixed-large {
+  height: 350px;
+}
+
+.card-fixed-xl {
+  height: 450px;
+}
+
+/* Card content sizing to match card heights */
+.card-content-small {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 180px;
+}
+
+.card-content-medium {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 240px;
+}
+
+.card-content-large {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 320px;
+}
+
+.card-content-xl {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+}
+
+/* Utility classes for consistent spacing */
+.card-header {
+  flex-shrink: 0;
+}
+
+.card-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* Responsive card sizing */
+@media (max-width: 768px) {
+  .card-size-small,
+  .card-fixed-small {
+    min-height: 160px;
+    height: 180px;
+  }
+  
+  .card-size-medium,
+  .card-fixed-medium {
+    min-height: 200px;
+    height: 220px;
+  }
+  
+  .card-size-large,
+  .card-fixed-large {
+    min-height: 280px;
+    height: 300px;
+  }
+  
+  .card-size-xl,
+  .card-fixed-xl {
+    min-height: 350px;
+    height: 380px;
+  }
+}

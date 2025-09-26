@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="CleanCourier">
+    
+    <!-- Apple Specific -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="CleanCourier">
+    
+    <!-- Microsoft -->
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="/icons/mstile-144x144.png">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    
+    <!-- Preload Icons (removed to prevent console warnings) -->
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="/icons/favicon.ico" sizes="16x16 32x32">
+    <link rel="icon" type="image/png" href="/icons/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/icons/favicon-16x16.png" sizes="16x16">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
+    <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="icon" type="image/png" href="/icons/android-chrome-192x192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="/icons/android-chrome-512x512.png" sizes="512x512">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="CleanCourier - On-demand pickup and delivery service for professional shoe and laundry cleaning. Schedule, track, and receive your items back spotless." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="LemoTech - On-demand cleaning services in South Africa. Book shoe cleaning, laundry, and dry cleaning with real-time tracking. Uber-like convenience for all your cleaning needs.">
+    <meta name="keywords" content="on-demand cleaning, shoe cleaning, laundry service, dry cleaning, South Africa, pickup delivery, real-time tracking">
+    <meta name="author" content="LemoTech Innovations">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="LemoTech - On-Demand Cleaning Services">
+    <meta property="og:description" content="Professional cleaning services with Uber-like convenience. Real-time tracking, pickup & delivery in South Africa.">
+    <meta property="og:image" content="/assets/lemotech-logo.png">
+    <meta property="og:url" content="https://lemotech.co.za">
+    <meta property="og:type" content="website">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="LemoTech - On-Demand Cleaning Services">
+    <meta name="twitter:description" content="Professional cleaning services with Uber-like convenience. Real-time tracking, pickup & delivery in South Africa.">
+    <meta name="twitter:image" content="/assets/lemotech-logo.png">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="en-ZA">
+    <meta name="geo.region" content="ZA">
+    <meta name="geo.placename" content="South Africa">
+    
+    <!-- Structured Data for Local Business -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "LemoTech",
+      "description": "Professional on-demand cleaning services in South Africa",
+      "url": "https://lemotech.co.za",
+      "telephone": "+27-XXX-XXX-XXXX",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "ZA",
+        "addressRegion": "Gauteng"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-26.2041",
+        "longitude": "28.0473"
+      },
+      "openingHours": "Mo-Su 06:00-22:00",
+      "priceRange": "R150-R500",
+      "serviceArea": {
+        "@type": "Country",
+        "name": "South Africa"
+      },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Cleaning Services",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Home Cleaning"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Office Cleaning"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Deep Cleaning"
+            }
+          }
+        ]
+      }
+    }
+    </script>
+    
+    <!-- Google Analytics GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      
+      // Replace G-XXXXXXXXXX with your actual GA4 Measurement ID
+      gtag('config', 'G-XXXXXXXXXX', {
+        page_title: document.title,
+        page_location: window.location.href,
+        send_page_view: true
+      });
+      
+      // Enhanced ecommerce tracking for service bookings
+      window.trackBookingEvent = function(eventName, bookingData) {
+        gtag('event', eventName, {
+          event_category: 'Booking',
+          event_label: bookingData.service_type,
+          value: bookingData.amount,
+          currency: 'ZAR',
+          custom_parameters: {
+            booking_id: bookingData.booking_id,
+            service_type: bookingData.service_type,
+            location: bookingData.location
+          }
+        });
+      };
+    </script>
+    
+    <title>LemoTech - On-Demand Cleaning Services | South Africa</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(() => {
+            // Service worker registered successfully
+          }).catch(() => {
+            // Service worker registration failed
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

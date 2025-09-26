@@ -80,6 +80,9 @@ stages:
         cd ..\deploy-package
         powershell -Command "(Get-Content package.json) -replace '\"start\": \".*\"', '\"start\": \"node dist/app.js\"' | Set-Content package.json"
         
+        echo Installing production dependencies...
+        npm install --production --legacy-peer-deps
+        
         echo Copying built dist files...
         cd ..\backend
         xcopy /E /I dist ..\deploy-package\dist
@@ -160,8 +163,9 @@ stages:
               resourceGroupName: $(resourceGroupName)
               package: '$(Pipeline.Workspace)/backend-drop/$(packageName)-$(Build.BuildId).zip'
               runtimeStack: 'NODE|20-lts'
-              startUpCommand: 'npm start'
+              startUpCommand: 'node dist/app.js'
               deploymentMethod: 'zipDeploy'
+              appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false'
             displayName: 'Deploy to Azure App Service'
           
           - task: AzureCLI@2
@@ -172,7 +176,7 @@ stages:
               inlineScript: |
                 echo "=== Configuring App Service Environment ==="
                 
-                # Set essential environment variables
+                # Set essential environment variables and disable build
                 az webapp config appsettings set \
                   --resource-group $(resourceGroupName) \
                   --name $(backendAppName) \
@@ -183,7 +187,9 @@ stages:
                     JWT_SECRET="LemoTech2024!SecureJWT!Production!Key!9x8v7c6b5n4m3" \
                     CORS_ORIGIN="*" \
                     AUTO_MIGRATE="true" \
-                    SEED_TEST_DATA="false"
+                    SEED_TEST_DATA="false" \
+                    SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
+                    ENABLE_ORYX_BUILD="false"
                 
                 echo "✅ Environment variables configured"
                 

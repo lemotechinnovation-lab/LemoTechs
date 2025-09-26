@@ -1,0 +1,11 @@
+{
+  "name": "lemotech-backend-test",
+  "version": "1.0.0",
+  "main": "test-minimal.js",
+  "scripts": {
+    "start": "node test-minimal.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

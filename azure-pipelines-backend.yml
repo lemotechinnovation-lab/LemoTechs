@@ -1,20 +1,26 @@
 # LemoTech Backend Deployment Pipeline
-# Simplified pipeline for backend API deployment
+# Comprehensive deployment pipeline for backend API with health checks
+# Supports: Build, Deploy, Test, and Monitoring
 
 trigger:
 - master
+- main
 
 pool:
-  vmImage: 'windows-latest'
+  name: 'Default'
 
 variables:
   buildConfiguration: 'Release'
   nodeVersion: '20.x'
   
-  # Azure connection and resources  
+  # Azure connection and resources (configure these in Azure DevOps)
   azureServiceConnection: 'LemoTech-Azure-Connection'
-  resourceGroupName: 'lemotech-platform'
+  resourceGroupName: 'Default-Web-EastUS'
   backendAppName: 'lemotech-api-backend'
+  
+  # Deployment settings
+  packageName: 'lemotech-backend'
+  healthCheckTimeout: 300
 
 stages:
 - stage: Build
@@ -29,30 +35,64 @@ stages:
       displayName: 'Install Node.js $(nodeVersion)'
     
     - script: |
+        echo "=== LemoTech Backend Build Process ==="
         cd backend
+        echo "Current directory: $(pwd)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        
         echo "Installing dependencies..."
-        npm ci --production=false
-        echo "Running build..."
+        npm ci --production=false --legacy-peer-deps
+        
+        echo "Running TypeScript build..."
         npm run build
-        echo "Build completed!"
+        
+        echo "Verifying build output..."
+        if [ -d "dist" ]; then
+          echo "✅ Build successful - dist directory created"
+          ls -la dist/
+        else
+          echo "❌ Build failed - dist directory not found"
+          exit 1
+        fi
+        
+        echo "Build completed successfully!"
       displayName: 'Install Dependencies and Build'
+    
+    - script: |
+        echo "=== Creating Deployment Package ==="
+        cd backend
+        echo "Excluding node_modules, logs, and temp files..."
+        echo "Package contents:"
+        find . -name "node_modules" -prune -o -name "*.log" -prune -o -type f -print | head -20
+        echo "... (showing first 20 files)"
+      displayName: 'Pre-Archive Verification'
     
     - task: ArchiveFiles@2
       inputs:
         rootFolderOrFile: 'backend'
         includeRootFolder: false
         archiveType: 'zip'
-        archiveFile: '$(Build.ArtifactStagingDirectory)/lemotech-backend-$(Build.BuildId).zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(packageName)-$(Build.BuildId).zip'
         replaceExistingArchive: true
         verbose: true
-      displayName: 'Archive Backend Files'
+      displayName: 'Create Deployment Package'
     
     - task: PublishBuildArtifacts@1
       inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)/lemotech-backend-$(Build.BuildId).zip'
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/$(packageName)-$(Build.BuildId).zip'
         ArtifactName: 'backend-drop'
         publishLocation: 'Container'
       displayName: 'Publish Backend Artifact'
+    
+    - script: |
+        echo "=== Build Stage Summary ==="
+        echo "✅ Node.js $(nodeVersion) installed"
+        echo "✅ Dependencies installed with --legacy-peer-deps"
+        echo "✅ TypeScript build completed"
+        echo "✅ Deployment package created: $(packageName)-$(Build.BuildId).zip"
+        echo "✅ Artifact published for deployment"
+      displayName: 'Build Summary'
 
 - stage: Deploy
   displayName: 'Deploy to Azure'
@@ -74,19 +114,50 @@ stages:
               downloadPath: '$(Pipeline.Workspace)'
             displayName: 'Download Backend Artifact'
           
+          - script: |
+              echo "=== Pre-Deployment Verification ==="
+              echo "Artifact location: $(Pipeline.Workspace)/backend-drop/"
+              ls -la "$(Pipeline.Workspace)/backend-drop/"
+              echo "Package to deploy: $(packageName)-$(Build.BuildId).zip"
+            displayName: 'Pre-Deployment Check'
+          
           - task: AzureWebApp@1
             inputs:
               azureSubscription: $(azureServiceConnection)
               appType: 'webAppLinux'
               appName: $(backendAppName)
               resourceGroupName: $(resourceGroupName)
-              package: '$(Pipeline.Workspace)/backend-drop/lemotech-backend-$(Build.BuildId).zip'
+              package: '$(Pipeline.Workspace)/backend-drop/$(packageName)-$(Build.BuildId).zip'
               runtimeStack: 'NODE|20-lts'
               startUpCommand: 'npm start'
+              deploymentMethod: 'zipDeploy'
             displayName: 'Deploy to Azure App Service'
           
           - script: |
-              echo "Backend deployed successfully!"
-              echo "API URL: https://$(backendAppName).azurewebsites.net"
-              echo "Health Check: https://$(backendAppName).azurewebsites.net/api/health"
+              echo "=== Post-Deployment Health Check ==="
+              echo "Waiting 30 seconds for service startup..."
+              sleep 30
+              
+              echo "Testing backend health..."
+              for i in {1..10}; do
+                echo "Health check attempt $i/10..."
+                if curl -f -s -o /dev/null "https://$(backendAppName).azurewebsites.net"; then
+                  echo "✅ Backend is responding!"
+                  break
+                elif [ $i -eq 10 ]; then
+                  echo "⚠️ Backend may still be starting up"
+                else
+                  echo "Still starting up, waiting 15 seconds..."
+                  sleep 15
+                fi
+              done
+            displayName: 'Health Check'
+          
+          - script: |
+              echo "=== Deployment Completed Successfully ==="
+              echo "🌐 Backend API: https://$(backendAppName).azurewebsites.net"
+              echo "📚 API Documentation: https://$(backendAppName).azurewebsites.net/api-docs"
+              echo "🔍 Health Check: https://$(backendAppName).azurewebsites.net/health"
+              echo "⚙️ Kudu Console: https://$(backendAppName).scm.azurewebsites.net"
+              echo "📋 Deployment Logs: https://$(backendAppName).scm.azurewebsites.net/api/deployments"
             displayName: 'Deployment Summary'

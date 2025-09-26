@@ -11,16 +11,33 @@ pool:
 variables:
   # Build configuration
   buildConfiguration: 'Release'
-  nodeVersion: '18.x'
-
+  nodeVersion: '20.x'
+  
   # Azure service connections (configure in Azure DevOps)
   azureServiceConnection: 'LemoTech-Azure-Connection'
-
-  # Resource names
+  
+  # Resource names - Updated for your actual setup
   resourceGroupName: 'lemotech-platform'
   backendAppName: 'lemotech-api-backend'
-  frontendAppName: 'lemotech-frontend'
-  adminAppName: 'lemotech-admin-dashboard'
+  frontendAppName: 'lemotech-frontend-$(Build.BuildId)'
+  adminAppName: 'lemotech-admin-$(Build.BuildId)'
+  
+  # Database configuration
+  databaseServer: 'lemotech-db-server'
+  databaseName: 'lemotech_innovations'
+  
+  # Environment-specific variables
+  ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+    environmentName: 'Production'
+    deploymentSlot: 'production'
+  ${{ else }}:
+    environmentName: 'Development'
+    deploymentSlot: 'staging'
+    
+  # Security and performance
+  enableSecurity: true
+  enablePerformanceTests: true
+  enableLoadTests: false
 
 stages:
 - stage: Build

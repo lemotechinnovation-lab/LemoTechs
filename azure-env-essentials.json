@@ -1,0 +1,37 @@
+[
+  {
+    "name": "NODE_ENV",
+    "value": "production",
+    "slotSetting": false
+  },
+  {
+    "name": "PORT",
+    "value": "8000",
+    "slotSetting": false
+  },
+  {
+    "name": "DATABASE_URL",
+    "value": "postgresql://lemotech_admin:SecureDB2024!Platform@lemotech-db-server.postgres.database.azure.com:5432/lemotech_innovations?sslmode=require",
+    "slotSetting": false
+  },
+  {
+    "name": "JWT_SECRET",
+    "value": "LemoTech2024!SecureJWT!Production!Key!9x8v7c6b5n4m3",
+    "slotSetting": false
+  },
+  {
+    "name": "CORS_ORIGIN",
+    "value": "*",
+    "slotSetting": false
+  },
+  {
+    "name": "AUTO_MIGRATE",
+    "value": "true",
+    "slotSetting": false
+  },
+  {
+    "name": "SEED_TEST_DATA",
+    "value": "false",
+    "slotSetting": false
+  }
+]

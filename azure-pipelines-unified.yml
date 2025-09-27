@@ -336,22 +336,31 @@ stages:
         # Copy web.config if exists
         [ -f ../backend/web.config ] && cp ../backend/web.config ./
         
-        echo "Step 8: Verify deployment package (BACKEND ONLY)..."
+        echo "Step 8: Verify deployment package structure for Azure..."
         echo "=== Final Deployment Package Contents ==="
-        echo "Main files:"
+        echo "Root files (app.js should be here):"
+        ls -la *.js 2>/dev/null | head -10
+        echo ""
+        echo "All main files:"
         ls -la
         echo ""
-        echo "Dist folder contents (should contain app.js):"
-        ls -la dist/ | head -10
+        echo "Critical verification - app.js in root:"
+        [ -f "app.js" ] && echo "✅ app.js EXISTS in root" || echo "❌ app.js MISSING from root"
         echo ""
-        echo "Final verification - dist/app.js exists:"
-        [ -f "dist/app.js" ] && echo "✅ dist/app.js EXISTS" || echo "❌ dist/app.js MISSING"
+        echo "Package.json startup command:"
+        grep -A 3 '"scripts"' package.json
+        echo ""
+        echo "Node modules installed:"
+        [ -d "node_modules" ] && echo "✅ node_modules EXISTS" || echo "❌ node_modules MISSING"
+        echo ""
+        echo "Migration files:"
+        [ -d "src/infrastructure/migrations" ] && echo "✅ migrations EXISTS" || echo "❌ migrations MISSING"
         echo ""
         echo "Checking for unwanted files (should be 0):"
         echo "Frontend files:" $(find . -name "*frontend*" -o -name "*admin*" 2>/dev/null | wc -l)
         echo "Source TS files:" $(find . -name "*.ts" -not -path "./node_modules/*" | wc -l)  
         echo ""
-        echo "✅ BACKEND-ONLY deployment package verified and ready!"
+        echo "✅ BACKEND-ONLY deployment package verified for Azure deployment!"
         
         echo "✅ Deployment package created!"
       displayName: 'Prepare Deployment Package'

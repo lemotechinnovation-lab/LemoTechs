@@ -7,7 +7,7 @@ trigger:
 - main
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Default'
 
 variables:
   buildConfiguration: 'Release'
@@ -197,6 +197,48 @@ stages:
               echo "Package to deploy: $(packageName)-$(Build.BuildId).zip"
             displayName: 'Pre-Deployment Check'
           
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "=== Installing Azure CLI on Windows Self-Hosted Agent ==="
+                
+                # Check if Azure CLI is already installed
+                try {
+                  $azVersion = az --version 2>$null
+                  if ($azVersion) {
+                    Write-Host "✅ Azure CLI already installed: $($azVersion[0])"
+                    exit 0
+                  }
+                } catch {
+                  Write-Host "Azure CLI not found, proceeding with installation..."
+                }
+                
+                # Install Azure CLI using PowerShell
+                Write-Host "Installing Azure CLI via PowerShell..."
+                try {
+                  Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
+                  Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+                  Remove-Item .\AzureCLI.msi
+                  
+                  # Refresh environment variables
+                  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+                  
+                  # Verify installation
+                  $azVersion = az --version 2>$null
+                  if ($azVersion) {
+                    Write-Host "✅ Azure CLI successfully installed: $($azVersion[0])"
+                  } else {
+                    Write-Host "❌ Azure CLI installation verification failed"
+                    exit 1
+                  }
+                } catch {
+                  Write-Host "❌ Failed to install Azure CLI: $_"
+                  exit 1
+                }
+            displayName: 'Install Azure CLI (Windows)'
+            condition: eq(variables['Agent.OS'], 'Windows_NT')
+          
           - task: AzureCLI@2
             inputs:
               azureSubscription: $(azureServiceConnection)
@@ -206,13 +248,19 @@ stages:
               inlineScript: |
                 echo "=== Pre-Deploy: Configuring App Service Environment ==="
                 
-                # Verify Azure CLI is available
+                # For Linux/macOS agents - install Azure CLI if needed
                 if ! command -v az &> /dev/null; then
                   echo "Azure CLI not found, installing..."
-                  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+                  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                    echo "Installing Azure CLI for Linux..."
+                    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+                  elif [[ "$OSTYPE" == "darwin"* ]]; then
+                    echo "Installing Azure CLI for macOS..."
+                    brew install azure-cli
+                  fi
                 fi
                 
-                echo "Azure CLI version: $(az --version | head -1)"
+                echo "✅ Azure CLI available: $(az --version | head -1)"
                 
                 # Set essential environment variables and disable build BEFORE deployment
                 az webapp config appsettings set \

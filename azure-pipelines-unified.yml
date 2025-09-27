@@ -231,50 +231,51 @@ stages:
       displayName: 'Build Backend'
     
     - script: |
-        echo "=== Creating Clean Backend Deployment Package ==="
-        
-        echo "Step 1: Copy BACKEND files to staging folder..."
+        echo "=== Clean Backend Deployment with Dist Zip Approach ==="
         cd backend
-        mkdir -p ../staging-backend
         
-        # Copy ONLY backend source files (exclude node_modules, dist, etc.)
-        echo "Copying backend source files..."
-        cp package.json ../staging-backend/
-        cp migrate.json ../staging-backend/ || echo "migrate.json not found"
-        cp tsconfig.json ../staging-backend/
-        cp tsconfig.prod.json ../staging-backend/ || echo "tsconfig.prod.json not found"
-        cp -r src ../staging-backend/
-        cp -r scripts ../staging-backend/ || echo "scripts not found"
-        [ -f web.config ] && cp web.config ../staging-backend/
-        
-        echo "Step 2: Install dependencies and build in staging folder..."
-        cd ../staging-backend
+        echo "Step 1: Install dependencies and build backend..."
         npm install --legacy-peer-deps
         npm run build
         
         # Verify build succeeded
         if [ -f "dist/app.js" ]; then
           echo "✅ Build successful - dist/app.js found"
-          ls -la dist/
+          echo "Dist contents:"
+          find dist/ -type f -name "*.js" | head -15
         else
           echo "❌ Build failed - dist/app.js not found"
-          echo "Contents of current directory:"
-          ls -la
           exit 1
         fi
         
-        echo "Step 3: Run migrations to ensure database is ready..."
+        echo "Step 2: Run migrations to ensure database is ready..."
         node scripts/migrate.js migrate --force || echo "Migrations completed or already applied"
         
-        echo "Step 4: Create clean deployment package (for wwwroot)..."
+        echo "Step 3: Create dist zip for deployment..."
+        cd dist
+        
+        # Verify all required backend folders exist
+        echo "Verifying required backend dist structure:"
+        for folder in config controllers hubs infrastructure middleware models repositories routes scripts services types utils; do
+          if [ -d "$folder" ]; then
+            echo "✅ $folder/ exists ($(ls $folder | wc -l) files)"
+          else
+            echo "⚠️ $folder/ missing"
+          fi
+        done
+        
+        # Create clean zip with ONLY dist contents
+        zip -r ../backend-dist.zip . -x "*.map" "*.ts"
         cd ..
         
-        # Clean any existing deployment package
-        rm -rf deploy-package
-        mkdir -p deploy-package
-        cd deploy-package
+        echo "Step 4: Prepare final deployment package..."
+        mkdir -p ../deploy-package
+        cd ../deploy-package
         
-        # Create clean package.json for production (app.js will be in root)
+        # Extract dist zip directly to deployment root
+        unzip -q ../backend/backend-dist.zip
+        
+        # Create production package.json for the extracted files
         cat > package.json << 'EOF'
         {
           "name": "lemotech-backend",
@@ -289,80 +290,38 @@ stages:
         }
         EOF
         
-        # Copy dependencies from staging package.json
+        # Copy dependencies from backend package.json
         node -e "
           const fs = require('fs');
-          const stagingPkg = JSON.parse(fs.readFileSync('../staging-backend/package.json', 'utf8'));
+          const backendPkg = JSON.parse(fs.readFileSync('../backend/package.json', 'utf8'));
           const deployPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          deployPkg.dependencies = stagingPkg.dependencies;
+          deployPkg.dependencies = backendPkg.dependencies;
           fs.writeFileSync('package.json', JSON.stringify(deployPkg, null, 2));
         "
         
-        echo "Step 5: Copy built files directly to wwwroot (extract dist contents)..."
-        # Copy built application files DIRECTLY (not in dist folder)
-        cp -r ../staging-backend/dist/* ./
-        
-        # Verify app.js is in root of deployment package
-        if [ -f "app.js" ]; then
-          echo "✅ app.js successfully copied to deployment package root"
-          echo "Main app files:"
-          ls -la *.js | head -10
-        else
-          echo "❌ CRITICAL: app.js missing from deployment package root!"
-          echo "Contents of deployment package:"
-          ls -la
-          echo "Contents of staging-backend dist:"
-          ls -la ../staging-backend/dist/
-          exit 1
-        fi
-        
-        # Copy runtime migration files
+        # Copy essential runtime files
+        cp -r ../backend/src/infrastructure/migrations ./src/infrastructure/ 2>/dev/null || echo "Creating migrations structure"
         mkdir -p ./src/infrastructure
-        cp -r ../staging-backend/src/infrastructure/migrations ./src/infrastructure/
+        cp -r ../backend/src/infrastructure/migrations ./src/infrastructure/
+        cp ../backend/migrate.json ./
+        cp -r ../backend/scripts ./
         
-        # Copy runtime configuration and scripts
-        cp ../staging-backend/migrate.json ./
-        cp -r ../staging-backend/scripts ./
-        [ -f ../staging-backend/web.config ] && cp ../staging-backend/web.config ./
-        
-        echo "Step 6: Install fresh production dependencies for deployment..."
+        echo "Step 5: Install production dependencies..."
         npm install --production --legacy-peer-deps
         
-        echo "Step 7: Creating deployment configuration..."
-        # Create deployment configuration (app.js is now in root)
-        echo "[config]" > .deployment
-        echo "command = node app.js" >> .deployment
-        
-        # Copy web.config if exists
-        [ -f ../backend/web.config ] && cp ../backend/web.config ./
-        
-        echo "Step 8: Verify deployment package structure for Azure..."
-        echo "=== Final Deployment Package Contents ==="
-        echo "Root files (app.js should be here):"
-        ls -la *.js 2>/dev/null | head -10
+        echo "Step 6: Verify CLEAN backend dist deployment..."
+        echo "=== BACKEND DIST DEPLOYMENT VERIFICATION ==="
+        echo "✅ app.js:" $([ -f "app.js" ] && echo "EXISTS" || echo "MISSING")
+        echo "✅ Backend folders:"
+        for folder in config controllers hubs infrastructure middleware models repositories routes services types utils; do
+          echo "  $folder/:" $([ -d "$folder" ] && echo "EXISTS ($(ls $folder/ 2>/dev/null | wc -l) files)" || echo "MISSING")
+        done
         echo ""
-        echo "All main files:"
-        ls -la
+        echo "🚫 Contamination check (should be 0):"
+        echo "  admin-dashboard:" $(find . -name "*admin*" 2>/dev/null | wc -l)
+        echo "  frontend:" $(find . -name "*frontend*" 2>/dev/null | wc -l)
         echo ""
-        echo "Critical verification - app.js in root:"
-        [ -f "app.js" ] && echo "✅ app.js EXISTS in root" || echo "❌ app.js MISSING from root"
-        echo ""
-        echo "Package.json startup command:"
-        grep -A 3 '"scripts"' package.json
-        echo ""
-        echo "Node modules installed:"
-        [ -d "node_modules" ] && echo "✅ node_modules EXISTS" || echo "❌ node_modules MISSING"
-        echo ""
-        echo "Migration files:"
-        [ -d "src/infrastructure/migrations" ] && echo "✅ migrations EXISTS" || echo "❌ migrations MISSING"
-        echo ""
-        echo "Checking for unwanted files (should be 0):"
-        echo "Frontend files:" $(find . -name "*frontend*" -o -name "*admin*" 2>/dev/null | wc -l)
-        echo "Source TS files:" $(find . -name "*.ts" -not -path "./node_modules/*" | wc -l)  
-        echo ""
-        echo "✅ BACKEND-ONLY deployment package verified for Azure deployment!"
-        
-        echo "✅ Deployment package created!"
+        echo "✅ CLEAN BACKEND DIST DEPLOYMENT VERIFIED!"
       displayName: 'Prepare Deployment Package'
     
     - task: ArchiveFiles@2

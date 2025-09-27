@@ -205,14 +205,6 @@ app.get('/api/service-items', async (req, res) => {
   }
 });
 
-// Catch-all route for undefined endpoints
-/* app.all('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint not found'
-  });
-}); */
-
 // Global error handler
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction): void => {
   Logger.error('Global error handler:', error);
@@ -309,8 +301,14 @@ const startServer = async () => {
         await SimpleServiceFactory.initialize();
         Logger.info('✅ Dependency injection initialized successfully');
       } catch (error) {
-        Logger.error('❌ Dependency injection initialization failed:', error);
-        process.exit(1);
+        const err = error as Error;
+        Logger.error('❌ Dependency injection initialization failed:', {
+          message: err?.message || 'Unknown error',
+          stack: err?.stack || 'No stack trace',
+          details: error
+        });
+        // Don't exit - continue without DI for basic functionality
+        Logger.warn('⚠️ Continuing without full dependency injection...');
       }
     } else {
       Logger.warn('⏭️  Skipping DI initialization: DATABASE_URL not set');

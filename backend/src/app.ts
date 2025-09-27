@@ -334,6 +334,15 @@ const startServer = async () => {
       Logger.info(`🔗 API endpoints: http://localhost:${PORT}/api`);
       Logger.info(`📡 SignalR Hub: http://localhost:${PORT}/hubs/bookingHub (Socket.IO)`);
       Logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      
+      // Keep deployment alive with periodic output
+      if (process.env.NODE_ENV === 'production') {
+        setInterval(() => {
+          console.log(`[${new Date().toISOString()}] LemoTech API - Server running healthy`);
+        }, 30000); // Output every 30 seconds
+      }
+      
+      Logger.info('🎉 STARTUP COMPLETE - Server ready to accept connections!');
     });
   } catch (error) {
     Logger.error('❌ Failed to start server:', error);

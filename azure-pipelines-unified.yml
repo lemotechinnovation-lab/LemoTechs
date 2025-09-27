@@ -393,9 +393,16 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          echo "=== Configuring Azure App Service Timeout Settings ==="
+          echo "=== Configuring Azure App Service Settings ==="
           
-          # Set timeout settings directly via Azure CLI
+          # Check current App Service plan
+          echo "Current App Service Plan:"
+          az appservice plan show \
+            --resource-group lemotech-platform \
+            --name $(az webapp show --resource-group lemotech-platform --name lemotech-api-backend --query appServicePlanId --output tsv | xargs basename) \
+            --query "{name:name, tier:sku.tier, size:sku.size, capacity:sku.capacity}"
+          
+          # Set timeout and performance settings
           az webapp config appsettings set \
             --resource-group lemotech-platform \
             --name lemotech-api-backend \
@@ -403,9 +410,13 @@ stages:
               SCM_COMMAND_IDLE_TIMEOUT=1200 \
               WEBJOBS_IDLE_TIMEOUT=1200 \
               WEBSITE_TIME_ZONE="UTC" \
-              WEBSITE_HTTPLOGGING_RETENTION_DAYS=3
+              WEBSITE_HTTPLOGGING_RETENTION_DAYS=3 \
+              WEBSITE_DYNAMIC_CACHE=0 \
+              WEBSITE_LOCAL_CACHE_OPTION=Never \
+              WEBSITE_NODE_DEFAULT_VERSION="~20" \
+              CUSTOM_STARTUP_COMMAND="node app.js"
           
-          echo "✅ Timeout settings configured: 1200 seconds (20 minutes)"
+          echo "✅ Timeout and performance settings configured"
       displayName: 'Configure App Service Timeouts'
     
     - script: |

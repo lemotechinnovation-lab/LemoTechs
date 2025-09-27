@@ -104,6 +104,15 @@ stages:
         cd ../backend
         cp -r dist ../deploy-package/
         
+        echo "Creating deployment configuration..."
+        # Create .deployment file to bypass Oryx
+        cat > ../deploy-package/.deployment << 'EOF'
+[config]
+SCM_DO_BUILD_DURING_DEPLOYMENT=false
+ENABLE_ORYX_BUILD=false
+COMMAND=node dist/app.js
+EOF
+        
         echo "Copying essential files..."
         [ -f web.config ] && cp web.config ../deploy-package/
         [ -f .deployment ] && cp .deployment ../deploy-package/
@@ -111,6 +120,15 @@ stages:
         echo "Package structure:"
         cd ../deploy-package
         ls -la
+        
+        echo "Verifying package.json for Node.js detection:"
+        cat package.json | head -15
+        
+        echo "Verifying dist directory:"
+        [ -d "dist" ] && ls -la dist/ | head -10
+        
+        echo "Verifying deployment configuration:"
+        [ -f ".deployment" ] && cat .deployment
       displayName: 'Prepare Oryx-compatible Package'
     
     - task: ArchiveFiles@2
@@ -182,7 +200,7 @@ stages:
               runtimeStack: 'NODE|20-lts'
               startUpCommand: 'node dist/app.js'
               deploymentMethod: 'zipDeploy'
-              appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false'
+              appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0'
             displayName: 'Deploy to Azure App Service'
           
           - task: AzureCLI@2
@@ -193,7 +211,7 @@ stages:
               inlineScript: |
                 echo "=== Configuring App Service Environment ==="
                 
-                # Set essential environment variables and disable build
+                # Set essential environment variables and disable build completely
                 az webapp config appsettings set \
                   --resource-group $(resourceGroupName) \
                   --name $(backendAppName) \
@@ -206,7 +224,10 @@ stages:
                     AUTO_MIGRATE="true" \
                     SEED_TEST_DATA="false" \
                     SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
-                    ENABLE_ORYX_BUILD="false"
+                    ENABLE_ORYX_BUILD="false" \
+                    WEBSITE_DISABLE_SCM_BUILD="true" \
+                    WEBSITE_RUN_FROM_PACKAGE="0" \
+                    WEBSITE_DISABLE_DEPLOYMENT_BUILD="true"
                 
                 echo "✅ Environment variables configured"
                 

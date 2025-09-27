@@ -1,0 +1,542 @@
+# LemoTech Unified Deployment Pipeline
+# Intelligent deployment that detects changes and deploys only what's needed
+
+trigger:
+  branches:
+    include:
+    - master
+    - main
+  paths:
+    exclude:
+    - docs/*
+    - README.md
+    - "*.md"
+
+pool:
+  name: 'Default'
+
+variables:
+  nodeVersion: '20.x'
+  environmentName: 'production'
+
+stages:
+- stage: DetectChanges
+  displayName: 'Detect Changes and Plan Deployment'
+  jobs:
+  - job: AnalyzeChanges
+    displayName: 'Analyze Changed Files'
+    steps:
+    - checkout: self
+      fetchDepth: 2
+      displayName: 'Checkout with History'
+    
+    - script: |
+        echo "=== LemoTech Intelligent Deployment System ==="
+        echo "Analyzing changes to determine deployment strategy..."
+        echo ""
+        
+        # Get changed files between this commit and the previous one
+        if [ "$(Build.Reason)" = "PullRequest" ]; then
+          echo "Pull Request detected, comparing with target branch..."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        else
+          echo "Direct push detected, comparing with previous commit..."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        fi
+        
+        echo "Changed files:"
+        echo "$CHANGED_FILES"
+        echo ""
+        
+        # Initialize deployment flags
+        DEPLOY_BACKEND=false
+        DEPLOY_FRONTEND=false
+        DEPLOY_ADMIN=false
+        
+        # Check for backend changes
+        if echo "$CHANGED_FILES" | grep -E "^(backend/|src/|\.deployment|azure-pipelines-backend\.yml|package\.json)" > /dev/null; then
+          echo "🔄 Backend changes detected!"
+          DEPLOY_BACKEND=true
+        fi
+        
+        # Check for frontend changes
+        if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
+          echo "🔄 Frontend changes detected!"
+          DEPLOY_FRONTEND=true
+        fi
+        
+        # Check for admin dashboard changes
+        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
+          echo "🔄 Admin dashboard changes detected!"
+          DEPLOY_ADMIN=true
+        fi
+        
+        # Check for template changes (affects all)
+        if echo "$CHANGED_FILES" | grep -E "^templates/" > /dev/null; then
+          echo "🔄 Template changes detected - will deploy all applications!"
+          DEPLOY_BACKEND=true
+          DEPLOY_FRONTEND=true
+          DEPLOY_ADMIN=true
+        fi
+        
+        # Force deploy all if no specific changes detected (safety)
+        if [ "$DEPLOY_BACKEND" = false ] && [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_ADMIN" = false ]; then
+          echo "🔄 No specific changes detected - deploying all for safety!"
+          DEPLOY_BACKEND=true
+          DEPLOY_FRONTEND=true
+          DEPLOY_ADMIN=true
+        fi
+        
+        echo ""
+        echo "=== Deployment Plan ==="
+        echo "Backend API: $DEPLOY_BACKEND"
+        echo "Frontend App: $DEPLOY_FRONTEND"
+        echo "Admin Dashboard: $DEPLOY_ADMIN"
+        echo ""
+        
+        # Set pipeline variables
+        echo "##vso[task.setvariable variable=deployBackend;isOutput=true]$DEPLOY_BACKEND"
+        echo "##vso[task.setvariable variable=deployFrontend;isOutput=true]$DEPLOY_FRONTEND"
+        echo "##vso[task.setvariable variable=deployAdmin;isOutput=true]$DEPLOY_ADMIN"
+        
+        echo "✅ Change analysis completed!"
+      displayName: 'Analyze Changed Files'
+      name: 'changes'
+
+- stage: InstallDependencies
+  displayName: 'Install Required Tools'
+  dependsOn: DetectChanges
+  jobs:
+  - job: SetupAgent
+    displayName: 'Setup Self-Hosted Agent'
+    steps:
+    - script: |
+        echo "=== Agent Environment Setup ==="
+        echo "Agent OS: $(Agent.OS)"
+        echo "Agent Name: $(Agent.Name)"
+        echo "Working Directory: $(System.DefaultWorkingDirectory)"
+        echo "Node.js Version Required: $(nodeVersion)"
+        echo ""
+        
+        # Check current Node.js version
+        if command -v node &> /dev/null; then
+          echo "Current Node.js: $(node --version)"
+        else
+          echo "Node.js not found"
+        fi
+        
+        # Check current npm version
+        if command -v npm &> /dev/null; then
+          echo "Current npm: $(npm --version)"
+        else
+          echo "npm not found"
+        fi
+      displayName: 'Check Agent Environment'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Azure CLI Installation for Self-Hosted Agent ==="
+        
+        # Check if Azure CLI is already available
+        if command -v az &> /dev/null; then
+          echo "✅ Azure CLI already installed: $(az --version | head -1)"
+          exit 0
+        fi
+        
+        echo "Azure CLI not found, installing..."
+        
+              # Detect OS and install accordingly
+              if [[ "$(uname)" == "Linux" ]]; then
+                echo "Installing Azure CLI for Linux..."
+                echo "Detected OS: $(cat /etc/os-release | grep PRETTY_NAME)"
+                
+                # Check if it's RHEL/CentOS/AlmaLinux based
+                if command -v dnf &> /dev/null; then
+                  echo "Using DNF package manager (RHEL/CentOS/AlmaLinux)..."
+                  
+                  # Import Microsoft repository key
+                  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+                  
+                  # Add Microsoft repository
+                  sudo dnf config-manager --add-repo https://packages.microsoft.com/config/rhel/8/packages-microsoft-com.repo
+                  
+                  # Install Azure CLI
+                  sudo dnf install -y azure-cli
+                  
+                elif command -v yum &> /dev/null; then
+                  echo "Using YUM package manager (older RHEL/CentOS)..."
+                  
+                  # Import Microsoft repository key
+                  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+                  
+                  # Add Microsoft repository
+                  sudo sh -c 'echo -e "[azure-cli]
+name=Azure CLI
+baseurl=https://packages.microsoft.com/config/rhel/8/packages-microsoft-com
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo'
+                  
+                  # Install Azure CLI
+                  sudo yum install -y azure-cli
+                  
+                elif command -v apt-get &> /dev/null; then
+                  echo "Using APT package manager (Debian/Ubuntu)..."
+                  
+                  # Update package lists
+                  sudo apt-get update
+                  
+                  # Install required packages
+                  sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
+                  
+                  # Download and install Microsoft signing key
+                  curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+                    gpg --dearmor | \
+                    sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+                  
+                  # Add Azure CLI software repository
+                  AZ_REPO=$(lsb_release -cs)
+                  echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+                    sudo tee /etc/apt/sources.list.d/azure-cli.list
+                  
+                  # Update package lists and install Azure CLI
+                  sudo apt-get update
+                  sudo apt-get install -y azure-cli
+                  
+                else
+                  echo "Unknown package manager, trying universal curl method..."
+                  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+                fi
+          
+        elif [[ "$RUNNER_OS" == "macOS" ]] || [[ "$(uname)" == "Darwin" ]]; then
+          echo "Installing Azure CLI for macOS..."
+          if command -v brew &> /dev/null; then
+            brew update
+            brew install azure-cli
+          else
+            echo "Homebrew not found, installing via curl..."
+            curl -L https://aka.ms/InstallAzureCli | bash
+          fi
+          
+        elif [[ "$RUNNER_OS" == "Windows" ]] || [[ "$(uname -s)" == *"MINGW"* ]] || [[ "$(uname -s)" == *"CYGWIN"* ]]; then
+          echo "Windows environment detected"
+          echo "For Windows self-hosted agents, please install Azure CLI manually:"
+          echo "https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows"
+          echo ""
+          echo "Or run this PowerShell command as Administrator:"
+          echo 'Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi; Start-Process msiexec.exe -Wait -ArgumentList "/I AzureCLI.msi /quiet"'
+          echo ""
+          echo "Checking if Azure CLI is available via PowerShell..."
+          
+          # Try to find Azure CLI in common Windows locations
+          if [ -f "/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
+            echo "Found Azure CLI in Program Files (x86)"
+            export PATH="/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
+          elif [ -f "/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
+            echo "Found Azure CLI in Program Files"
+            export PATH="/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
+          else
+            echo "Azure CLI not found in standard Windows locations"
+            echo "Please install Azure CLI on your Windows self-hosted agent"
+            echo "Continuing without Azure CLI - some features may not work"
+            exit 0
+          fi
+          
+        else
+          echo "Unknown operating system: $(uname)"
+          echo "Please install Azure CLI manually"
+          exit 1
+        fi
+        
+        # Verify installation
+        if command -v az &> /dev/null; then
+          echo "✅ Azure CLI successfully installed!"
+          echo "Version: $(az --version | head -1)"
+        else
+          echo "❌ Azure CLI installation failed or not found in PATH"
+          echo "Some deployment features may not work"
+        fi
+        
+        echo "✅ Agent setup completed!"
+      displayName: 'Install Azure CLI'
+
+- stage: DeployApplications
+  displayName: 'Deploy Applications'
+  dependsOn: 
+  - DetectChanges
+  - InstallDependencies
+  variables:
+    deployBackend: $[ stageDependencies.DetectChanges.AnalyzeChanges.outputs['changes.deployBackend'] ]
+    deployFrontend: $[ stageDependencies.DetectChanges.AnalyzeChanges.outputs['changes.deployFrontend'] ]
+    deployAdmin: $[ stageDependencies.DetectChanges.AnalyzeChanges.outputs['changes.deployAdmin'] ]
+  jobs:
+  # Backend Deployment
+  - job: DeployBackend
+    displayName: 'Deploy Backend API'
+    condition: eq(variables.deployBackend, 'true')
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Backend API Deployment ==="
+        cd backend
+        echo "Current directory: $(pwd)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        
+        echo "Installing dependencies..."
+        npm install --legacy-peer-deps
+        
+        echo "Running TypeScript build..."
+        npx tsc -p tsconfig.prod.json
+        
+        echo "Verifying build output..."
+        if [ -d "dist" ]; then
+          echo "✅ Build successful - dist directory created"
+          ls -la dist/
+        else
+          echo "❌ Build failed - dist directory not found"
+          exit 1
+        fi
+      displayName: 'Build Backend'
+    
+    - script: |
+        echo "=== Creating Deployment Package ==="
+        mkdir -p deploy-package
+        cd backend
+        
+        # Copy package.json and create clean version
+        cp package.json ../deploy-package/
+        cd ../deploy-package
+        
+        # Create clean package.json for deployment
+        node -e "
+          const fs = require('fs');
+          const original = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const clean = {
+            name: original.name,
+            version: original.version,
+            main: 'dist/app.js',
+            scripts: {
+              start: 'node dist/app.js'
+            },
+            engines: original.engines,
+            dependencies: original.dependencies
+          };
+          fs.writeFileSync('package.json', JSON.stringify(clean, null, 2));
+        "
+        
+        echo "Installing production dependencies..."
+        npm install --production --legacy-peer-deps
+        
+        # Copy built files
+        cd ../backend
+        cp -r dist ../deploy-package/
+        
+        # Create deployment configuration
+        echo "[config]" > ../deploy-package/.deployment
+        echo "command = node dist/app.js" >> ../deploy-package/.deployment
+        
+        # Copy web.config if exists
+        [ -f web.config ] && cp web.config ../deploy-package/
+        
+        echo "✅ Deployment package created!"
+      displayName: 'Prepare Deployment Package'
+    
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: 'deploy-package'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive Backend Package'
+    
+    - task: AzureWebApp@1
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        appType: 'webAppLinux'
+        appName: 'lemotech-api-backend'
+        resourceGroupName: 'lemotech-platform'
+        package: '$(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip'
+        runtimeStack: 'NODE|20-lts'
+        startUpCommand: 'node dist/app.js'
+        deploymentMethod: 'zipDeploy'
+        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000'
+      displayName: 'Deploy to Azure App Service'
+    
+    - script: |
+        echo "=== Backend Health Check ==="
+        sleep 60
+        
+        BACKEND_URL="https://lemotech-api-backend.azurewebsites.net"
+        
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          if curl -f -s -o /dev/null "$BACKEND_URL/health" 2>/dev/null; then
+            echo "✅ Backend is healthy!"
+            break
+          elif [ $i -eq 10 ]; then
+            echo "⚠️ Backend health check timeout"
+          else
+            sleep 30
+          fi
+        done
+      displayName: 'Verify Backend Health'
+
+  # Frontend Deployment
+  - job: DeployFrontend
+    displayName: 'Deploy Frontend App'
+    condition: eq(variables.deployFrontend, 'true')
+    dependsOn: DeployBackend
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Frontend Application Deployment ==="
+        cd frontend
+        
+        # Create environment file
+        cat > .env << EOF
+        VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
+        VITE_ENVIRONMENT=production
+        VITE_APP_TITLE=LemoTech - On-Demand Cleaning
+        NODE_ENV=production
+        EOF
+        
+        echo "Installing dependencies..."
+        npm ci
+        
+        echo "Building React application..."
+        npm run build
+        
+        if [ -d "dist" ]; then
+          echo "✅ Frontend build successful!"
+          ls -la dist/
+        else
+          echo "❌ Frontend build failed!"
+          exit 1
+        fi
+      displayName: 'Build Frontend'
+    
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+        app_location: '/frontend'
+        output_location: 'dist'
+        skip_app_build: true
+      displayName: 'Deploy to Azure Static Web Apps'
+
+  # Admin Dashboard Deployment
+  - job: DeployAdmin
+    displayName: 'Deploy Admin Dashboard'
+    condition: eq(variables.deployAdmin, 'true')
+    dependsOn: DeployFrontend
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Admin Dashboard Deployment ==="
+        cd admin-dashboard
+        
+        # Create environment file
+        cat > .env << EOF
+        VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
+        VITE_ENVIRONMENT=production
+        VITE_APP_TITLE=LemoTech Admin Dashboard
+        VITE_REQUIRE_AUTH=true
+        NODE_ENV=production
+        EOF
+        
+        echo "Installing dependencies..."
+        npm ci
+        
+        echo "Building admin dashboard..."
+        npm run build
+        
+        if [ -d "dist" ]; then
+          echo "✅ Admin dashboard build successful!"
+          
+          # Add security configuration
+          cat > dist/staticwebapp.config.json << EOF
+          {
+            "routes": [
+              {
+                "route": "/*",
+                "serve": "/index.html",
+                "statusCode": 200,
+                "allowedRoles": ["admin", "manager"]
+              }
+            ],
+            "responseOverrides": {
+              "401": {
+                "redirect": "/login",
+                "statusCode": 302
+              }
+            },
+            "globalHeaders": {
+              "X-Frame-Options": "DENY",
+              "X-Content-Type-Options": "nosniff",
+              "Strict-Transport-Security": "max-age=31536000"
+            }
+          }
+          EOF
+          
+          ls -la dist/
+        else
+          echo "❌ Admin dashboard build failed!"
+          exit 1
+        fi
+      displayName: 'Build Admin Dashboard'
+    
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_static_web_apps_api_token: '$(AZURE_ADMIN_STATIC_WEB_APPS_API_TOKEN)'
+        app_location: '/admin-dashboard'
+        output_location: 'dist'
+        skip_app_build: true
+      displayName: 'Deploy Admin to Azure Static Web Apps'
+
+- stage: DeploymentSummary
+  displayName: 'Deployment Summary'
+  dependsOn: DeployApplications
+  condition: always()
+  jobs:
+  - job: Summary
+    displayName: 'Generate Summary'
+    steps:
+    - script: |
+        echo "=== 🚀 LemoTech Deployment Complete! ==="
+        echo ""
+        echo "Build: $(Build.BuildNumber)"
+        echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo ""
+        echo "🌐 Application URLs:"
+        echo "Backend API: https://lemotech-api-backend.azurewebsites.net"
+        echo "Frontend: Check Azure Static Web Apps for URL"
+        echo "Admin: Check Azure Static Web Apps for URL"
+        echo ""
+        echo "✅ Deployment completed successfully!"
+      displayName: 'Display Summary'

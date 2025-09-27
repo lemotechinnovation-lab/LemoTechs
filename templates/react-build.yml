@@ -1,0 +1,148 @@
+# Reusable React/Vite Build Template
+# Supports: React, TypeScript, Vite, Environment Variables, Caching
+
+parameters:
+  - name: nodeVersion
+    type: string
+    default: '20.x'
+  - name: workingDirectory
+    type: string
+    default: '.'
+  - name: environmentName
+    type: string
+    default: 'production'
+  - name: apiBaseUrl
+    type: string
+    default: ''
+  - name: customBuildCommand
+    type: string
+    default: 'npm run build'
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: ${{ parameters.nodeVersion }}
+    displayName: 'Install Node.js ${{ parameters.nodeVersion }}'
+
+  - task: Cache@2
+    inputs:
+      key: 'npm | "$(Agent.OS)" | ${{ parameters.workingDirectory }}/package-lock.json'
+      restoreKeys: |
+        npm | "$(Agent.OS)"
+        npm
+      path: '${{ parameters.workingDirectory }}/node_modules'
+    displayName: 'Cache npm packages'
+
+  - script: |
+      echo "=== LemoTech React Build Process ==="
+      echo "Working Directory: ${{ parameters.workingDirectory }}"
+      echo "Environment: ${{ parameters.environmentName }}"
+      echo "Node Version: $(node --version)"
+      echo "NPM Version: $(npm --version)"
+      
+      echo "Cleaning previous builds..."
+      rm -rf dist build .vite node_modules/.vite
+      
+      echo "Installing dependencies..."
+      npm ci --prefer-offline --no-audit
+      
+      echo "Verifying build tools..."
+      npx vite --version || echo "Vite not found in node_modules"
+      npx tsc --version || echo "TypeScript not found"
+      
+      echo "Building application..."
+      ${{ parameters.customBuildCommand }}
+      
+      # Verify build output
+      if [ -d "dist" ]; then
+        echo "✅ Build successful - dist directory created"
+        echo "Build contents:"
+        ls -la dist/
+        echo "Build size:"
+        du -sh dist/
+      elif [ -d "build" ]; then
+        echo "✅ Build successful - build directory created"
+        echo "Build contents:"
+        ls -la build/
+        echo "Build size:"
+        du -sh build/
+        # Rename build to dist for consistency
+        mv build dist
+      else
+        echo "❌ Build failed - no output directory found"
+        exit 1
+      fi
+      
+      echo "Creating build metadata..."
+      cat > dist/build-info.json << EOF
+      {
+        "buildNumber": "$(Build.BuildNumber)",
+        "buildId": "$(Build.BuildId)",
+        "sourceVersion": "$(Build.SourceVersion)",
+        "sourceBranch": "$(Build.SourceBranch)",
+        "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+        "environment": "${{ parameters.environmentName }}",
+        "nodeVersion": "$(node --version)",
+        "npmVersion": "$(npm --version)"
+      }
+      EOF
+      
+      echo "Build completed successfully!"
+    workingDirectory: '${{ parameters.workingDirectory }}'
+    displayName: 'Build React Application'
+    env:
+      REACT_APP_API_BASE_URL: ${{ parameters.apiBaseUrl }}
+      VITE_API_BASE_URL: ${{ parameters.apiBaseUrl }}
+      VITE_ENVIRONMENT: ${{ parameters.environmentName }}
+      NODE_ENV: production
+
+  - script: |
+      echo "=== Build Verification ==="
+      echo "Checking for essential files..."
+      
+      # Check for index.html
+      if [ -f "dist/index.html" ]; then
+        echo "✅ index.html found"
+      else
+        echo "❌ index.html missing"
+        exit 1
+      fi
+      
+      # Check for assets
+      if [ -d "dist/assets" ]; then
+        echo "✅ Assets directory found"
+        echo "Asset files:"
+        ls -la dist/assets/ | head -10
+      else
+        echo "⚠️ No assets directory found"
+      fi
+      
+      # Check bundle size
+      BUNDLE_SIZE=$(du -sk dist/ | cut -f1)
+      echo "Bundle size: ${BUNDLE_SIZE}KB"
+      
+      # Warn if bundle is very large (>50MB)
+      if [ $BUNDLE_SIZE -gt 51200 ]; then
+        echo "⚠️ Large bundle size detected: ${BUNDLE_SIZE}KB"
+      fi
+      
+      echo "Build verification completed!"
+    workingDirectory: '${{ parameters.workingDirectory }}'
+    displayName: 'Verify Build Output'
+
+  - task: ArchiveFiles@2
+    inputs:
+      rootFolderOrFile: '${{ parameters.workingDirectory }}/dist'
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-build.zip'
+      replaceExistingArchive: true
+      verbose: true
+    displayName: 'Archive Build Artifacts'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-build.zip'
+      ArtifactName: '${{ parameters.environmentName }}-build'
+      publishLocation: 'Container'
+    displayName: 'Publish Build Artifacts'

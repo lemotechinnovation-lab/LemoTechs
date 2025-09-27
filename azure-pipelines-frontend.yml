@@ -1,46 +1,77 @@
 # LemoTech Frontend Deployment Pipeline
-# Deploys React frontend to Azure Static Web Apps
+# Comprehensive React frontend deployment with environment management
 
 trigger:
   branches:
     include:
     - master
+    - develop
   paths:
     include:
     - frontend/*
+    - templates/*
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: 'Default'
 
 variables:
   buildConfiguration: 'Release'
   nodeVersion: '20.x'
+  frontendPath: 'frontend'
+  environmentName: 'production'
+  applicationName: 'frontend'
 
 stages:
-- stage: BuildAndDeploy
-  displayName: 'Build and Deploy Frontend'
+- stage: BuildFrontend
+  displayName: 'Build Frontend Application'
   jobs:
-  - job: DeployFrontend
-    displayName: 'Deploy LemoTech Frontend'
+  - job: BuildReactApp
+    displayName: 'Build LemoTech Frontend'
     steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: $(nodeVersion)
-      displayName: 'Install Node.js $(nodeVersion)'
+    - checkout: self
+      displayName: 'Checkout Source Code'
     
-    - script: |
-        cd frontend
-        echo "Installing frontend dependencies..."
-        npm ci
-        echo "Building React application..."
-        npm run build
-        echo "Frontend build completed!"
-      displayName: 'Build Frontend Application'
+    - template: templates/environment-config.yml
+      parameters:
+        environmentName: $(environmentName)
+        applicationName: $(applicationName)
     
-    - task: AzureStaticWebApp@0
-      inputs:
-        azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
-        app_location: '/frontend'
-        output_location: 'dist'
-        skip_app_build: true
-      displayName: 'Deploy to Azure Static Web Apps'
+    - template: templates/react-build.yml
+      parameters:
+        nodeVersion: $(nodeVersion)
+        workingDirectory: $(frontendPath)
+        environmentName: $(environmentName)
+        apiBaseUrl: $(API_BASE_URL)
+        customBuildCommand: 'npm run build'
+
+- stage: DeployFrontend
+  displayName: 'Deploy to Azure Static Web Apps'
+  dependsOn: BuildFrontend
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToAzure
+    displayName: 'Deploy Frontend to Azure'
+    environment: 'Frontend-Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: 'production-build'
+            displayName: 'Download Build Artifacts'
+          
+          - task: ExtractFiles@1
+            inputs:
+              archiveFilePatterns: '$(Pipeline.Workspace)/production-build/production-build.zip'
+              destinationFolder: '$(Pipeline.Workspace)/frontend-dist'
+              cleanDestinationFolder: true
+            displayName: 'Extract Build Files'
+          
+          - template: templates/azure-static-deploy.yml
+            parameters:
+              staticWebAppToken: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+              appLocation: '$(Pipeline.Workspace)/frontend-dist'
+              outputLocation: '.'
+              environmentName: $(environmentName)
+              customDomain: 'app.lemotech.co.za'  # Update with your actual domain
+              skipAppBuild: true

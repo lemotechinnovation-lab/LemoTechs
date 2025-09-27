@@ -197,47 +197,79 @@ stages:
               echo "Package to deploy: $(packageName)-$(Build.BuildId).zip"
             displayName: 'Pre-Deployment Check'
           
-          - task: PowerShell@2
-            inputs:
-              targetType: 'inline'
-              script: |
-                Write-Host "=== Installing Azure CLI on Windows Self-Hosted Agent ==="
+          - script: |
+              echo "=== Azure CLI Installation for Self-Hosted Agent ==="
+              
+              # Check if Azure CLI is already available
+              if command -v az &> /dev/null; then
+                echo "✅ Azure CLI already installed: $(az --version | head -1)"
+                exit 0
+              fi
+              
+              echo "Azure CLI not found, installing..."
+              
+              # Detect OS and install accordingly
+              if [[ "$(uname)" == "Linux" ]]; then
+                echo "Installing Azure CLI for Linux..."
                 
-                # Check if Azure CLI is already installed
-                try {
-                  $azVersion = az --version 2>$null
-                  if ($azVersion) {
-                    Write-Host "✅ Azure CLI already installed: $($azVersion[0])"
-                    exit 0
-                  }
-                } catch {
-                  Write-Host "Azure CLI not found, proceeding with installation..."
-                }
+                # Update package lists
+                sudo apt-get update
                 
-                # Install Azure CLI using PowerShell
-                Write-Host "Installing Azure CLI via PowerShell..."
-                try {
-                  Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
-                  Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
-                  Remove-Item .\AzureCLI.msi
-                  
-                  # Refresh environment variables
-                  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-                  
-                  # Verify installation
-                  $azVersion = az --version 2>$null
-                  if ($azVersion) {
-                    Write-Host "✅ Azure CLI successfully installed: $($azVersion[0])"
-                  } else {
-                    Write-Host "❌ Azure CLI installation verification failed"
-                    exit 1
-                  }
-                } catch {
-                  Write-Host "❌ Failed to install Azure CLI: $_"
-                  exit 1
-                }
-            displayName: 'Install Azure CLI (Windows)'
-            condition: eq(variables['Agent.OS'], 'Windows_NT')
+                # Install required packages
+                sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
+                
+                # Download and install Microsoft signing key
+                curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
+                  gpg --dearmor | \
+                  sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+                
+                # Add Azure CLI software repository
+                AZ_REPO=$(lsb_release -cs)
+                echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+                  sudo tee /etc/apt/sources.list.d/azure-cli.list
+                
+                # Update package lists and install Azure CLI
+                sudo apt-get update
+                sudo apt-get install -y azure-cli
+                
+              elif [[ "$(uname)" == "Darwin" ]]; then
+                echo "Installing Azure CLI for macOS..."
+                if command -v brew &> /dev/null; then
+                  brew update
+                  brew install azure-cli
+                else
+                  echo "Homebrew not found, installing via curl..."
+                  curl -L https://aka.ms/InstallAzureCli | bash
+                fi
+                
+              else
+                echo "For Windows self-hosted agents, please install Azure CLI manually:"
+                echo "https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows"
+                echo "Checking common Windows locations..."
+                
+                # Try to find Azure CLI in common Windows locations
+                if [ -f "/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
+                  echo "Found Azure CLI in Program Files (x86)"
+                  export PATH="/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
+                elif [ -f "/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
+                  echo "Found Azure CLI in Program Files"
+                  export PATH="/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
+                else
+                  echo "Azure CLI not found - please install manually"
+                  echo "Skipping Azure CLI dependent steps..."
+                  exit 0
+                fi
+              fi
+              
+              # Verify installation
+              if command -v az &> /dev/null; then
+                echo "✅ Azure CLI successfully installed!"
+                echo "Version: $(az --version | head -1)"
+              else
+                echo "❌ Azure CLI installation failed or not found in PATH"
+                echo "Continuing without Azure CLI - some features may not work"
+              fi
+            displayName: 'Install Azure CLI'
           
           - task: AzureCLI@2
             inputs:

@@ -1,0 +1,119 @@
+# Environment Configuration Template
+# Centralized environment variable management
+
+parameters:
+  - name: environmentName
+    type: string
+  - name: applicationName
+    type: string
+
+steps:
+  - script: |
+      echo "=== Environment Configuration Setup ==="
+      echo "Environment: ${{ parameters.environmentName }}"
+      echo "Application: ${{ parameters.applicationName }}"
+      
+      # Create environment-specific configuration
+      case "${{ parameters.environmentName }}" in
+        "development")
+          echo "Setting up development environment..."
+          echo "##vso[task.setvariable variable=API_BASE_URL]https://lemotech-api-backend-dev.azurewebsites.net"
+          echo "##vso[task.setvariable variable=ENVIRONMENT_SUFFIX]-dev"
+          echo "##vso[task.setvariable variable=CACHE_CONTROL]no-cache"
+          echo "##vso[task.setvariable variable=DEBUG_MODE]true"
+          ;;
+        "staging")
+          echo "Setting up staging environment..."
+          echo "##vso[task.setvariable variable=API_BASE_URL]https://lemotech-api-backend-staging.azurewebsites.net"
+          echo "##vso[task.setvariable variable=ENVIRONMENT_SUFFIX]-staging"
+          echo "##vso[task.setvariable variable=CACHE_CONTROL]max-age=300"
+          echo "##vso[task.setvariable variable=DEBUG_MODE]false"
+          ;;
+        "production")
+          echo "Setting up production environment..."
+          echo "##vso[task.setvariable variable=API_BASE_URL]https://lemotech-api-backend.azurewebsites.net"
+          echo "##vso[task.setvariable variable=ENVIRONMENT_SUFFIX]"
+          echo "##vso[task.setvariable variable=CACHE_CONTROL]max-age=31536000"
+          echo "##vso[task.setvariable variable=DEBUG_MODE]false"
+          ;;
+        *)
+          echo "❌ Unknown environment: ${{ parameters.environmentName }}"
+          exit 1
+          ;;
+      esac
+      
+      # Application-specific configuration
+      case "${{ parameters.applicationName }}" in
+        "frontend")
+          echo "Configuring frontend-specific variables..."
+          echo "##vso[task.setvariable variable=APP_TITLE]LemoTech - On-Demand Cleaning"
+          echo "##vso[task.setvariable variable=APP_TYPE]customer"
+          echo "##vso[task.setvariable variable=ANALYTICS_ID]G-XXXXX" # Replace with actual
+          ;;
+        "admin-dashboard")
+          echo "Configuring admin dashboard-specific variables..."
+          echo "##vso[task.setvariable variable=APP_TITLE]LemoTech Admin Dashboard"
+          echo "##vso[task.setvariable variable=APP_TYPE]admin"
+          echo "##vso[task.setvariable variable=REQUIRE_AUTH]true"
+          echo "##vso[task.setvariable variable=ADMIN_ROLES]admin,manager"
+          ;;
+        *)
+          echo "❌ Unknown application: ${{ parameters.applicationName }}"
+          exit 1
+          ;;
+      esac
+      
+      # Common variables
+      echo "##vso[task.setvariable variable=BUILD_TIMESTAMP]$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo "##vso[task.setvariable variable=BUILD_VERSION]$(Build.BuildNumber)"
+      echo "##vso[task.setvariable variable=COMMIT_HASH]$(Build.SourceVersion)"
+      
+      echo "✅ Environment configuration completed!"
+      echo "API Base URL: $(API_BASE_URL)"
+      echo "Environment Suffix: $(ENVIRONMENT_SUFFIX)"
+      echo "Cache Control: $(CACHE_CONTROL)"
+      echo "Debug Mode: $(DEBUG_MODE)"
+    displayName: 'Configure Environment Variables'
+
+  - script: |
+      echo "=== Creating Environment File ==="
+      
+      # Create .env file for build process
+      cat > .env << EOF
+      # Auto-generated environment configuration
+      # Environment: ${{ parameters.environmentName }}
+      # Application: ${{ parameters.applicationName }}
+      # Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+      
+      VITE_API_BASE_URL=$(API_BASE_URL)
+      VITE_ENVIRONMENT=${{ parameters.environmentName }}
+      VITE_APP_TITLE=$(APP_TITLE)
+      VITE_APP_TYPE=$(APP_TYPE)
+      VITE_DEBUG_MODE=$(DEBUG_MODE)
+      VITE_BUILD_VERSION=$(BUILD_VERSION)
+      VITE_BUILD_TIMESTAMP=$(BUILD_TIMESTAMP)
+      VITE_COMMIT_HASH=$(COMMIT_HASH)
+      
+      # React App compatibility (legacy)
+      REACT_APP_API_BASE_URL=$(API_BASE_URL)
+      REACT_APP_ENVIRONMENT=${{ parameters.environmentName }}
+      REACT_APP_APP_TITLE=$(APP_TITLE)
+      
+      NODE_ENV=production
+      EOF
+      
+      # Add application-specific variables
+      if [ "${{ parameters.applicationName }}" = "admin-dashboard" ]; then
+        cat >> .env << EOF
+      VITE_REQUIRE_AUTH=$(REQUIRE_AUTH)
+      VITE_ADMIN_ROLES=$(ADMIN_ROLES)
+      EOF
+      fi
+      
+      echo "Environment file created:"
+      echo "--- .env ---"
+      cat .env
+      echo "--- end ---"
+      
+      echo "✅ Environment file configuration completed!"
+    displayName: 'Create Environment File'

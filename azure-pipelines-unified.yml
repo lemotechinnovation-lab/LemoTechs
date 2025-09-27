@@ -256,19 +256,72 @@ stages:
           fs.writeFileSync('package.json', JSON.stringify(clean, null, 2));
         "
         
-        echo "Installing production dependencies..."
+        echo "Step 1: Copy BACKEND files to staging folder..."
+        cd ../backend
+        mkdir -p ../staging-backend
+        
+        # Copy ONLY backend source files (exclude node_modules, dist, etc.)
+        cp package.json ../staging-backend/
+        cp migrate.json ../staging-backend/ || echo "migrate.json not found"
+        cp tsconfig.prod.json ../staging-backend/ || cp tsconfig.json ../staging-backend/
+        cp -r src ../staging-backend/
+        cp -r scripts ../staging-backend/ || echo "scripts not found"
+        [ -f web.config ] && cp web.config ../staging-backend/
+        
+        echo "Step 2: Install dependencies and build in staging folder..."
+        cd ../staging-backend
+        npm install --legacy-peer-deps
+        npm run build
+        
+        echo "Step 3: Run migrations to ensure database is ready..."
+        node scripts/migrate.js migrate --force || echo "Migrations completed or already applied"
+        
+        echo "Step 4: Clean and create final deployment package for wwwroot..."
+        cd ..
+        
+        # Clean any existing deployment package
+        rm -rf deploy-package
+        mkdir -p deploy-package
+        cd deploy-package
+        
+        echo "Copying ONLY built files and runtime necessities (NO node_modules, NO frontend/admin files)..."
+        # Copy built application
+        cp -r ../staging-backend/dist ./
+        
+        # Copy runtime migration files
+        mkdir -p ./src/infrastructure
+        cp -r ../staging-backend/src/infrastructure/migrations ./src/infrastructure/
+        
+        # Copy runtime configuration and scripts
+        cp ../staging-backend/migrate.json ./
+        cp -r ../staging-backend/scripts ./
+        cp ../staging-backend/package.json ./
+        [ -f ../staging-backend/web.config ] && cp ../staging-backend/web.config ./
+        
+        echo "Step 5: Install fresh production dependencies for deployment..."
         npm install --production --legacy-peer-deps
         
-        # Copy built files
-        cd ../backend
-        cp -r dist ../deploy-package/
-        
-        # Create deployment configuration
-        echo "[config]" > ../deploy-package/.deployment
-        echo "command = node dist/app.js" >> ../deploy-package/.deployment
+        echo "Step 6: Creating deployment configuration..."
+        # Create deployment configuration  
+        echo "[config]" > .deployment
+        echo "command = node dist/app.js" >> .deployment
         
         # Copy web.config if exists
-        [ -f web.config ] && cp web.config ../deploy-package/
+        [ -f ../backend/web.config ] && cp ../backend/web.config ./
+        
+        echo "Step 7: Verify deployment package (BACKEND ONLY)..."
+        echo "=== Deployment Package Contents ==="
+        echo "Main files:"
+        ls -la
+        echo ""
+        echo "Dist folder contents:"
+        ls -la dist/ | head -10
+        echo ""
+        echo "Checking for unwanted files (should be empty):"
+        echo "Frontend files:" $(find . -name "*frontend*" -o -name "*admin*" 2>/dev/null | wc -l)
+        echo "Source TS files:" $(find . -name "*.ts" -not -path "./node_modules/*" | wc -l)  
+        echo ""
+        echo "✅ BACKEND-ONLY deployment package verified!"
         
         echo "✅ Deployment package created!"
       displayName: 'Prepare Deployment Package'

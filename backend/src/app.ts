@@ -335,14 +335,28 @@ const startServer = async () => {
       Logger.info(`📡 SignalR Hub: http://localhost:${PORT}/hubs/bookingHub (Socket.IO)`);
       Logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       
-      // Keep deployment alive with periodic output
+      // Keep deployment alive with periodic output (only for first 5 minutes)
       if (process.env.NODE_ENV === 'production') {
-        setInterval(() => {
-          console.log(`[${new Date().toISOString()}] LemoTech API - Server running healthy`);
-        }, 30000); // Output every 30 seconds
+        let healthOutputCount = 0;
+        const maxHealthOutputs = 10; // 5 minutes worth (30s * 10 = 5min)
+        
+        const healthInterval = setInterval(() => {
+          if (healthOutputCount >= maxHealthOutputs) {
+            clearInterval(healthInterval);
+            console.log(`[${new Date().toISOString()}] LemoTech API - Health reporting completed, server running normally`);
+            return;
+          }
+          console.log(`[${new Date().toISOString()}] LemoTech API - Server running healthy (${healthOutputCount + 1}/${maxHealthOutputs})`);
+          healthOutputCount++;
+        }, 30000); // Output every 30 seconds for 5 minutes
       }
       
       Logger.info('🎉 STARTUP COMPLETE - Server ready to accept connections!');
+      
+      // Signal deployment completion for Azure
+      if (process.env.NODE_ENV === 'production') {
+        console.log('DEPLOYMENT_COMPLETE'); // Clear signal for Azure deployment detection
+      }
     });
   } catch (error) {
     Logger.error('❌ Failed to start server:', error);

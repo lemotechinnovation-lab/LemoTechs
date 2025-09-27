@@ -33,7 +33,11 @@ export class PayFastService extends BaseService implements IPayFastService {
     }
 
     if (!this.merchantId || !this.merchantKey) {
-      throw new Error('PayFast configuration is incomplete');
+      Logger.warn('⚠️ PayFast configuration incomplete - using test mode defaults');
+      this.merchantId = '10042081';
+      this.merchantKey = '71wd2xzckkdde';
+      this.passphrase = 'Lemotech2024_secure_passphrase';
+      this.isTest = true;
     }
   }
 

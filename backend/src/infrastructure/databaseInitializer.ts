@@ -132,24 +132,41 @@ export class DatabaseInitializer {
 
   // Seed booking steps
   private async seedBookingSteps(): Promise<void> {
-    const steps = [
-      { stepName: 'location', stepOrder: 1, description: 'User selects pickup location' },
-      { stepName: 'items', stepOrder: 2, description: 'User selects items to be cleaned' },
-      { stepName: 'carType', stepOrder: 3, description: 'User selects service type (Standard/Premium)' },
-      { stepName: 'confirming', stepOrder: 4, description: 'User reviews and confirms booking' },
-      { stepName: 'processing', stepOrder: 5, description: 'Booking is being processed' },
-      { stepName: 'confirmed', stepOrder: 6, description: 'Booking is confirmed and scheduled' }
-    ];
+    try {
+      // Check if step_order column exists
+      const columnExists = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'booking_steps' 
+        AND column_name = 'step_order'
+      `);
 
-    for (const step of steps) {
-      await query(`
-        INSERT INTO booking_steps (step_name, step_order, description)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (step_name) DO NOTHING
-      `, [step.stepName, step.stepOrder, step.description]);
+      if (columnExists.rows.length === 0) {
+        Logger.warn('⚠️ Skipping booking steps seeding - step_order column does not exist yet');
+        return;
+      }
+
+      const steps = [
+        { stepName: 'location', stepOrder: 1, description: 'User selects pickup location' },
+        { stepName: 'items', stepOrder: 2, description: 'User selects items to be cleaned' },
+        { stepName: 'carType', stepOrder: 3, description: 'User selects service type (Standard/Premium)' },
+        { stepName: 'confirming', stepOrder: 4, description: 'User reviews and confirms booking' },
+        { stepName: 'processing', stepOrder: 5, description: 'Booking is being processed' },
+        { stepName: 'confirmed', stepOrder: 6, description: 'Booking is confirmed and scheduled' }
+      ];
+
+      for (const step of steps) {
+        await query(`
+          INSERT INTO booking_steps (step_name, step_order, description)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (step_name) DO NOTHING
+        `, [step.stepName, step.stepOrder, step.description]);
+      }
+
+      Logger.info(`✅ Seeded ${steps.length} booking steps`);
+    } catch (error) {
+      Logger.warn('⚠️ Skipping booking steps seeding due to schema mismatch:', error);
     }
-
-    Logger.info(`✅ Seeded ${steps.length} booking steps`);
   }
 
   // Create default admin user

@@ -106,12 +106,10 @@ stages:
         
         echo "Creating deployment configuration..."
         # Create .deployment file to bypass Oryx
-        cat > ../deploy-package/.deployment << 'EOF'
-[config]
-SCM_DO_BUILD_DURING_DEPLOYMENT=false
-ENABLE_ORYX_BUILD=false
-COMMAND=node dist/app.js
-EOF
+        echo "[config]" > ../deploy-package/.deployment
+        echo "SCM_DO_BUILD_DURING_DEPLOYMENT=false" >> ../deploy-package/.deployment
+        echo "ENABLE_ORYX_BUILD=false" >> ../deploy-package/.deployment
+        echo "COMMAND=node dist/app.js" >> ../deploy-package/.deployment
         
         echo "Copying essential files..."
         [ -f web.config ] && cp web.config ../deploy-package/

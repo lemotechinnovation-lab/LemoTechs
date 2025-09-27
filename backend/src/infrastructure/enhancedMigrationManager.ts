@@ -46,10 +46,26 @@ export class EnhancedMigrationManager {
   private versionTable: string = 'schema_migrations';
 
   constructor() {
-    // Point to source migrations directory since JS files are not compiled
-    this.migrationsPath = path.join(process.cwd(), 'src', 'infrastructure', 'migrations');
+    // Point to migrations directory - check multiple possible locations
+    const possiblePaths = [
+      path.join(process.cwd(), 'src', 'infrastructure', 'migrations'), // Development/local
+      path.join(process.cwd(), 'migrations'), // If migrations are in root
+      path.join(__dirname, 'migrations'), // Relative to compiled location
+      path.join(__dirname, '..', '..', 'src', 'infrastructure', 'migrations') // From dist back to src
+    ];
+    
+    this.migrationsPath = possiblePaths.find(p => {
+      try {
+        return require('fs').existsSync(p);
+      } catch {
+        return false;
+      }
+    }) ?? possiblePaths[0]!; // Default to first if none found
+    
     this.configPath = path.join(process.cwd(), 'migrate.json');
     this.schemaPath = path.join(this.migrationsPath, 'sql');
+    
+    console.log(`🔍 Migration path resolved to: ${this.migrationsPath}`);
   }
 
   /**

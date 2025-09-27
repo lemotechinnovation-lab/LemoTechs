@@ -16,8 +16,11 @@ pool:
   name: 'Default'
 
 variables:
-  nodeVersion: '20.x'
-  environmentName: 'production'
+  - group: LemoTech-Production-Variables
+  - name: nodeVersion
+    value: '20.x'
+  - name: environmentName
+    value: 'production'
 
 stages:
 - stage: DetectChanges

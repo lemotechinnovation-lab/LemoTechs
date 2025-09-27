@@ -147,118 +147,32 @@ stages:
           exit 0
         fi
         
-        echo "Azure CLI not found, installing..."
+        echo "Azure CLI not found, installing via pip..."
         
-              # Detect OS and install accordingly
-              if [[ "$(uname)" == "Linux" ]]; then
-                echo "Installing Azure CLI for Linux..."
-                echo "Detected OS: $(cat /etc/os-release | grep PRETTY_NAME)"
-                
-                # Check if it's RHEL/CentOS/AlmaLinux based
-                if command -v dnf &> /dev/null; then
-                  echo "Using DNF package manager (RHEL/CentOS/AlmaLinux)..."
-                  
-                  # Import Microsoft repository key
-                  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                  
-                  # Add Microsoft repository
-                  sudo dnf config-manager --add-repo https://packages.microsoft.com/config/rhel/8/packages-microsoft-com.repo
-                  
-                  # Install Azure CLI
-                  sudo dnf install -y azure-cli
-                  
-                elif command -v yum &> /dev/null; then
-                  echo "Using YUM package manager (older RHEL/CentOS)..."
-                  
-                  # Import Microsoft repository key
-                  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                  
-                  # Add Microsoft repository
-                  sudo sh -c 'echo -e "[azure-cli]
-name=Azure CLI
-baseurl=https://packages.microsoft.com/config/rhel/8/packages-microsoft-com
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo'
-                  
-                  # Install Azure CLI
-                  sudo yum install -y azure-cli
-                  
-                elif command -v apt-get &> /dev/null; then
-                  echo "Using APT package manager (Debian/Ubuntu)..."
-                  
-                  # Update package lists
-                  sudo apt-get update
-                  
-                  # Install required packages
-                  sudo apt-get install -y ca-certificates curl apt-transport-https lsb-release gnupg
-                  
-                  # Download and install Microsoft signing key
-                  curl -sL https://packages.microsoft.com/keys/microsoft.asc | \
-                    gpg --dearmor | \
-                    sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
-                  
-                  # Add Azure CLI software repository
-                  AZ_REPO=$(lsb_release -cs)
-                  echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
-                    sudo tee /etc/apt/sources.list.d/azure-cli.list
-                  
-                  # Update package lists and install Azure CLI
-                  sudo apt-get update
-                  sudo apt-get install -y azure-cli
-                  
-                else
-                  echo "Unknown package manager, trying universal curl method..."
-                  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-                fi
-          
-        elif [[ "$RUNNER_OS" == "macOS" ]] || [[ "$(uname)" == "Darwin" ]]; then
-          echo "Installing Azure CLI for macOS..."
-          if command -v brew &> /dev/null; then
-            brew update
-            brew install azure-cli
-          else
-            echo "Homebrew not found, installing via curl..."
-            curl -L https://aka.ms/InstallAzureCli | bash
-          fi
-          
-        elif [[ "$RUNNER_OS" == "Windows" ]] || [[ "$(uname -s)" == *"MINGW"* ]] || [[ "$(uname -s)" == *"CYGWIN"* ]]; then
-          echo "Windows environment detected"
-          echo "For Windows self-hosted agents, please install Azure CLI manually:"
-          echo "https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows"
-          echo ""
-          echo "Or run this PowerShell command as Administrator:"
-          echo 'Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi; Start-Process msiexec.exe -Wait -ArgumentList "/I AzureCLI.msi /quiet"'
-          echo ""
-          echo "Checking if Azure CLI is available via PowerShell..."
-          
-          # Try to find Azure CLI in common Windows locations
-          if [ -f "/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
-            echo "Found Azure CLI in Program Files (x86)"
-            export PATH="/c/Program Files (x86)/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
-          elif [ -f "/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin/az.cmd" ]; then
-            echo "Found Azure CLI in Program Files"
-            export PATH="/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin:$PATH"
-          else
-            echo "Azure CLI not found in standard Windows locations"
-            echo "Please install Azure CLI on your Windows self-hosted agent"
-            echo "Continuing without Azure CLI - some features may not work"
-            exit 0
-          fi
-          
-        else
-          echo "Unknown operating system: $(uname)"
-          echo "Please install Azure CLI manually"
-          exit 1
+        # Install Azure CLI via pip (most reliable method)
+        if command -v dnf &> /dev/null; then
+          sudo dnf install -y python3-pip
+        elif command -v apt-get &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+        elif command -v yum &> /dev/null; then
+          sudo yum install -y python3-pip
         fi
+        
+        # Install Azure CLI
+        pip3 install azure-cli
+        
+        # Add to PATH
+        export PATH="$HOME/.local/bin:$PATH"
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
         
         # Verify installation
         if command -v az &> /dev/null; then
           echo "✅ Azure CLI successfully installed!"
           echo "Version: $(az --version | head -1)"
         else
-          echo "❌ Azure CLI installation failed or not found in PATH"
-          echo "Some deployment features may not work"
+          echo "❌ Azure CLI installation failed"
+          echo "Continuing without Azure CLI - using simplified deployment"
         fi
         
         echo "✅ Agent setup completed!"
@@ -267,8 +181,8 @@ gpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azu
 - stage: DeployApplications
   displayName: 'Deploy Applications'
   dependsOn: 
-  - DetectChanges
-  - InstallDependencies
+    - DetectChanges
+    - InstallDependencies
   variables:
     deployBackend: $[ stageDependencies.DetectChanges.AnalyzeChanges.outputs['changes.deployBackend'] ]
     deployFrontend: $[ stageDependencies.DetectChanges.AnalyzeChanges.outputs['changes.deployFrontend'] ]

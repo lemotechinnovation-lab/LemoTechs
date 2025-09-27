@@ -9,211 +9,248 @@ exports.shorthands = undefined;
  * @returns {Promise<void> | void}
  */
 exports.up = (pgm) => {
-  // Booking steps - Multi-step booking process tracking
-  pgm.createTable('booking_steps', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    step_name: { type: 'varchar(50)', notNull: true, unique: true },
-    step_order: { type: 'integer', notNull: true },
-    description: { type: 'text' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  // UUID functions are available in PostgreSQL 15
+
+  // Booking steps - Multi-step booking process tracking (skip if already exists)
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS booking_steps (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      step_name varchar(50) NOT NULL UNIQUE,
+      step_order integer NOT NULL,
+      description text,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Cleaning items - Individual items within a booking
-  pgm.createTable('cleaning_items', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', notNull: true },
-    service_item_id: { type: 'uuid', references: 'service_items(id)', onDelete: 'SET NULL' },
-    item_name: { type: 'varchar(200)', notNull: true },
-    item_description: { type: 'text' },
-    quantity: { type: 'integer', default: 1 },
-    unit_price: { type: 'decimal(10,2)', notNull: true },
-    total_price: { type: 'decimal(10,2)', notNull: true },
-    special_instructions: { type: 'text' },
-    before_photos: { type: 'jsonb' }, // Array of photo URLs
-    after_photos: { type: 'jsonb' }, // Array of photo URLs
-    status: { type: 'varchar(30)', default: 'pending' }, // pending, cleaning, completed, damaged
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS cleaning_items (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      service_item_id uuid REFERENCES service_items(id) ON DELETE SET NULL,
+      item_name varchar(200) NOT NULL,
+      item_description text,
+      quantity integer DEFAULT 1,
+      unit_price decimal(10,2) NOT NULL,
+      total_price decimal(10,2) NOT NULL,
+      special_instructions text,
+      before_photos jsonb,
+      after_photos jsonb,
+      status varchar(30) DEFAULT 'pending',
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Driver jobs - Driver work assignments
-  pgm.createTable('driver_jobs', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    driver_id: { type: 'uuid', references: 'drivers(id)', onDelete: 'CASCADE', notNull: true },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', notNull: true },
-    job_type: { type: 'varchar(20)', notNull: true }, // pickup, delivery
-    status: { type: 'varchar(20)', notNull: true, default: 'assigned' }, // assigned, started, completed, cancelled
-    assigned_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    started_at: { type: 'timestamp' },
-    completed_at: { type: 'timestamp' },
-    location: { type: 'text', notNull: true },
-    coordinates: { type: 'point' },
-    estimated_time: { type: 'integer' }, // minutes
-    actual_time: { type: 'integer' }, // minutes
-    notes: { type: 'text' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS driver_jobs (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      driver_id uuid NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+      booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      job_type varchar(20) NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'assigned',
+      assigned_at timestamp DEFAULT current_timestamp,
+      started_at timestamp,
+      completed_at timestamp,
+      location text NOT NULL,
+      coordinates point,
+      estimated_time integer,
+      actual_time integer,
+      notes text,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // In-progress bookings - Active booking tracking
-  pgm.createTable('in_progress_bookings', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', unique: true, notNull: true },
-    current_step: { type: 'varchar(30)', notNull: true }, // pickup_scheduled, picked_up, cleaning, ready, out_for_delivery, delivered
-    driver_id: { type: 'uuid', references: 'drivers(id)', onDelete: 'SET NULL' },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'SET NULL' },
-    pickup_eta: { type: 'timestamp' },
-    cleaning_eta: { type: 'timestamp' },
-    delivery_eta: { type: 'timestamp' },
-    last_update: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS in_progress_bookings (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id uuid NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
+      current_step varchar(30) NOT NULL,
+      driver_id uuid REFERENCES drivers(id) ON DELETE SET NULL,
+      shop_id uuid REFERENCES shops(id) ON DELETE SET NULL,
+      pickup_eta timestamp,
+      cleaning_eta timestamp,
+      delivery_eta timestamp,
+      last_update timestamp DEFAULT current_timestamp,
+      created_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Payment refunds - Refund transaction tracking
-  pgm.createTable('payment_refunds', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    original_transaction_id: { type: 'uuid', references: 'payment_transactions(id)', onDelete: 'CASCADE', notNull: true },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', notNull: true },
-    user_id: { type: 'uuid', references: 'users(id)', onDelete: 'CASCADE', notNull: true },
-    refund_amount: { type: 'decimal(10,2)', notNull: true },
-    refund_reason: { type: 'varchar(100)', notNull: true },
-    status: { type: 'varchar(20)', notNull: true, default: 'pending' }, // pending, processing, completed, failed
-    provider: { type: 'varchar(50)', notNull: true },
-    external_refund_id: { type: 'varchar(255)' },
-    provider_response: { type: 'jsonb' },
-    processed_at: { type: 'timestamp' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS payment_refunds (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      original_transaction_id uuid NOT NULL REFERENCES payment_transactions(id) ON DELETE CASCADE,
+      booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      refund_amount decimal(10,2) NOT NULL,
+      refund_reason varchar(100) NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      provider varchar(50) NOT NULL,
+      external_refund_id varchar(255),
+      provider_response jsonb,
+      processed_at timestamp,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Phone verifications - Phone number verification tracking
-  pgm.createTable('phone_verifications', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    user_id: { type: 'uuid', references: 'users(id)', onDelete: 'CASCADE' },
-    phone_number: { type: 'varchar(20)', notNull: true },
-    verification_code: { type: 'varchar(10)', notNull: true },
-    is_verified: { type: 'boolean', default: false },
-    attempts: { type: 'integer', default: 0 },
-    expires_at: { type: 'timestamp', notNull: true },
-    verified_at: { type: 'timestamp' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS phone_verifications (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+      phone_number varchar(20) NOT NULL,
+      verification_code varchar(10) NOT NULL,
+      is_verified boolean DEFAULT false,
+      attempts integer DEFAULT 0,
+      expires_at timestamp NOT NULL,
+      verified_at timestamp,
+      created_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Shop capacity planning - Shop workload management
-  pgm.createTable('shop_capacity_planning', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'CASCADE', notNull: true },
-    date: { type: 'date', notNull: true },
-    hour: { type: 'integer', notNull: true }, // 0-23
-    max_capacity: { type: 'integer', notNull: true },
-    current_load: { type: 'integer', default: 0 },
-    available_slots: { type: 'integer', notNull: true },
-    is_available: { type: 'boolean', default: true },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS shop_capacity_planning (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      shop_id uuid NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      date date NOT NULL,
+      hour integer NOT NULL,
+      max_capacity integer NOT NULL,
+      current_load integer DEFAULT 0,
+      available_slots integer NOT NULL,
+      is_available boolean DEFAULT true,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Shop inventory - Shop supplies and materials
-  pgm.createTable('shop_inventory', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'CASCADE', notNull: true },
-    item_name: { type: 'varchar(100)', notNull: true },
-    item_category: { type: 'varchar(50)', notNull: true }, // cleaning_supplies, equipment, packaging
-    current_stock: { type: 'integer', notNull: true },
-    minimum_stock: { type: 'integer', notNull: true },
-    unit: { type: 'varchar(20)', notNull: true }, // pieces, liters, kg
-    cost_per_unit: { type: 'decimal(10,2)' },
-    supplier: { type: 'varchar(100)' },
-    last_restocked: { type: 'timestamp' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS shop_inventory (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      shop_id uuid NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      item_name varchar(100) NOT NULL,
+      item_category varchar(50) NOT NULL,
+      current_stock integer NOT NULL,
+      minimum_stock integer NOT NULL,
+      unit varchar(20) NOT NULL,
+      cost_per_unit decimal(10,2),
+      supplier varchar(100),
+      last_restocked timestamp,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Shop inventory tracking - Inventory movement history
-  pgm.createTable('shop_inventory_tracking', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    inventory_id: { type: 'uuid', references: 'shop_inventory(id)', onDelete: 'CASCADE', notNull: true },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'CASCADE', notNull: true },
-    movement_type: { type: 'varchar(20)', notNull: true }, // use, restock, adjustment, waste
-    quantity_change: { type: 'integer', notNull: true }, // positive for add, negative for use
-    previous_stock: { type: 'integer', notNull: true },
-    new_stock: { type: 'integer', notNull: true },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'SET NULL' },
-    notes: { type: 'text' },
-    created_by: { type: 'uuid', references: 'users(id)', onDelete: 'SET NULL' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS shop_inventory_tracking (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      inventory_id uuid NOT NULL REFERENCES shop_inventory(id) ON DELETE CASCADE,
+      shop_id uuid NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      movement_type varchar(20) NOT NULL,
+      quantity_change integer NOT NULL,
+      previous_stock integer NOT NULL,
+      new_stock integer NOT NULL,
+      booking_id uuid REFERENCES bookings(id) ON DELETE SET NULL,
+      notes text,
+      created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Shop orders - Internal shop order management
-  pgm.createTable('shop_orders', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'CASCADE', notNull: true },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', notNull: true },
-    order_number: { type: 'varchar(20)', unique: true, notNull: true },
-    priority: { type: 'varchar(10)', default: 'normal' }, // low, normal, high, urgent
-    status: { type: 'varchar(20)', notNull: true, default: 'received' }, // received, processing, completed, quality_check, ready
-    assigned_staff: { type: 'varchar(100)' },
-    estimated_completion: { type: 'timestamp' },
-    actual_completion: { type: 'timestamp' },
-    quality_notes: { type: 'text' },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS shop_orders (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      shop_id uuid NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      order_number varchar(20) UNIQUE NOT NULL,
+      priority varchar(10) DEFAULT 'normal',
+      status varchar(20) NOT NULL DEFAULT 'received',
+      assigned_staff varchar(100),
+      estimated_completion timestamp,
+      actual_completion timestamp,
+      quality_notes text,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
   // Shop queue - Shop processing queue management
-  pgm.createTable('shop_queue', {
-    id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'CASCADE', notNull: true },
-    shop_order_id: { type: 'uuid', references: 'shop_orders(id)', onDelete: 'CASCADE', notNull: true },
-    queue_position: { type: 'integer', notNull: true },
-    estimated_start_time: { type: 'timestamp' },
-    estimated_completion_time: { type: 'timestamp' },
-    actual_start_time: { type: 'timestamp' },
-    queue_date: { type: 'date', notNull: true },
-    is_active: { type: 'boolean', default: true },
-    created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
-    updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
-  });
+  pgm.sql(`
+    CREATE TABLE IF NOT EXISTS shop_queue (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      shop_id uuid NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+      shop_order_id uuid NOT NULL REFERENCES shop_orders(id) ON DELETE CASCADE,
+      queue_position integer NOT NULL,
+      estimated_start_time timestamp,
+      estimated_completion_time timestamp,
+      actual_start_time timestamp,
+      queue_date date NOT NULL,
+      is_active boolean DEFAULT true,
+      created_at timestamp DEFAULT current_timestamp,
+      updated_at timestamp DEFAULT current_timestamp
+    );
+  `);
 
-  // Add indexes for performance
-  pgm.createIndex('booking_steps', 'booking_id');
-  pgm.createIndex('booking_steps', ['booking_id', 'step_number']);
-  pgm.createIndex('cleaning_items', 'booking_id');
-  pgm.createIndex('cleaning_items', 'service_item_id');
-  pgm.createIndex('cleaning_items', 'status');
-  pgm.createIndex('driver_jobs', 'driver_id');
-  pgm.createIndex('driver_jobs', 'booking_id');
-  pgm.createIndex('driver_jobs', 'status');
-  pgm.createIndex('driver_jobs', 'job_type');
-  pgm.createIndex('in_progress_bookings', 'booking_id');
-  pgm.createIndex('in_progress_bookings', 'current_step');
-  pgm.createIndex('in_progress_bookings', 'driver_id');
-  pgm.createIndex('in_progress_bookings', 'shop_id');
-  pgm.createIndex('payment_refunds', 'original_transaction_id');
-  pgm.createIndex('payment_refunds', 'booking_id');
-  pgm.createIndex('payment_refunds', 'status');
-  pgm.createIndex('phone_verifications', 'phone_number');
-  pgm.createIndex('phone_verifications', 'user_id');
-  pgm.createIndex('phone_verifications', 'expires_at');
-  pgm.createIndex('shop_capacity_planning', 'shop_id');
-  pgm.createIndex('shop_capacity_planning', ['shop_id', 'date', 'hour']);
-  pgm.createIndex('shop_inventory', 'shop_id');
-  pgm.createIndex('shop_inventory', 'item_category');
-  pgm.createIndex('shop_inventory_tracking', 'inventory_id');
-  pgm.createIndex('shop_inventory_tracking', 'shop_id');
-  pgm.createIndex('shop_inventory_tracking', 'booking_id');
-  pgm.createIndex('shop_orders', 'shop_id');
-  pgm.createIndex('shop_orders', 'booking_id');
-  pgm.createIndex('shop_orders', 'status');
-  pgm.createIndex('shop_orders', 'order_number');
-  pgm.createIndex('shop_queue', 'shop_id');
-  pgm.createIndex('shop_queue', 'shop_order_id');
-  pgm.createIndex('shop_queue', ['shop_id', 'queue_date', 'queue_position']);
+  // Add indexes for performance (only if they don't exist)
+  pgm.sql(`CREATE INDEX IF NOT EXISTS cleaning_items_booking_id_index ON cleaning_items (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS cleaning_items_service_item_id_index ON cleaning_items (service_item_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS cleaning_items_status_index ON cleaning_items (status);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS driver_jobs_driver_id_index ON driver_jobs (driver_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS driver_jobs_booking_id_index ON driver_jobs (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS driver_jobs_status_index ON driver_jobs (status);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS driver_jobs_job_type_index ON driver_jobs (job_type);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS in_progress_bookings_booking_id_index ON in_progress_bookings (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS in_progress_bookings_current_step_index ON in_progress_bookings (current_step);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS in_progress_bookings_driver_id_index ON in_progress_bookings (driver_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS in_progress_bookings_shop_id_index ON in_progress_bookings (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS payment_refunds_original_transaction_id_index ON payment_refunds (original_transaction_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS payment_refunds_booking_id_index ON payment_refunds (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS payment_refunds_status_index ON payment_refunds (status);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS phone_verifications_phone_number_index ON phone_verifications (phone_number);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS phone_verifications_user_id_index ON phone_verifications (user_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS phone_verifications_expires_at_index ON phone_verifications (expires_at);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_capacity_planning_shop_id_index ON shop_capacity_planning (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_capacity_planning_shop_id_date_hour_index ON shop_capacity_planning (shop_id, date, hour);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_inventory_shop_id_index ON shop_inventory (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_inventory_item_category_index ON shop_inventory (item_category);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_inventory_tracking_inventory_id_index ON shop_inventory_tracking (inventory_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_inventory_tracking_shop_id_index ON shop_inventory_tracking (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_inventory_tracking_booking_id_index ON shop_inventory_tracking (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_orders_shop_id_index ON shop_orders (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_orders_booking_id_index ON shop_orders (booking_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_orders_status_index ON shop_orders (status);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_orders_order_number_index ON shop_orders (order_number);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_queue_shop_id_index ON shop_queue (shop_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_queue_shop_order_id_index ON shop_queue (shop_order_id);`);
+  pgm.sql(`CREATE INDEX IF NOT EXISTS shop_queue_shop_id_queue_date_queue_position_index ON shop_queue (shop_id, queue_date, queue_position);`);
 
-  // Add unique constraints
-  pgm.addConstraint('shop_capacity_planning', 'unique_shop_date_hour', 'UNIQUE(shop_id, date, hour)');
-  pgm.addConstraint('shop_queue', 'unique_shop_position_date', 'UNIQUE(shop_id, queue_position, queue_date)');
+  // Add unique constraints (only if they don't exist)
+  pgm.sql(`
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_shop_date_hour') THEN
+        ALTER TABLE shop_capacity_planning ADD CONSTRAINT unique_shop_date_hour UNIQUE(shop_id, date, hour);
+      END IF;
+    END $$;
+  `);
+  
+  pgm.sql(`
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'unique_shop_position_date') THEN
+        ALTER TABLE shop_queue ADD CONSTRAINT unique_shop_position_date UNIQUE(shop_id, queue_position, queue_date);
+      END IF;
+    END $$;
+  `);
 };
 
 /**
@@ -223,15 +260,15 @@ exports.up = (pgm) => {
  */
 exports.down = (pgm) => {
   // Drop all new tables in reverse order
-  pgm.dropTable('shop_queue');
-  pgm.dropTable('shop_orders');
-  pgm.dropTable('shop_inventory_tracking');
-  pgm.dropTable('shop_inventory');
-  pgm.dropTable('shop_capacity_planning');
-  pgm.dropTable('phone_verifications');
-  pgm.dropTable('payment_refunds');
-  pgm.dropTable('in_progress_bookings');
-  pgm.dropTable('driver_jobs');
-  pgm.dropTable('cleaning_items');
-  pgm.dropTable('booking_steps');
+  pgm.dropTable('shop_queue', { ifExists: true });
+  pgm.dropTable('shop_orders', { ifExists: true });
+  pgm.dropTable('shop_inventory_tracking', { ifExists: true });
+  pgm.dropTable('shop_inventory', { ifExists: true });
+  pgm.dropTable('shop_capacity_planning', { ifExists: true });
+  pgm.dropTable('phone_verifications', { ifExists: true });
+  pgm.dropTable('payment_refunds', { ifExists: true });
+  pgm.dropTable('in_progress_bookings', { ifExists: true });
+  pgm.dropTable('driver_jobs', { ifExists: true });
+  pgm.dropTable('cleaning_items', { ifExists: true });
+  pgm.dropTable('booking_steps', { ifExists: true });
 };

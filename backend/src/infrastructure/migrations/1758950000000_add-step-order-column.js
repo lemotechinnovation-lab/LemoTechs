@@ -9,12 +9,19 @@ exports.shorthands = undefined;
  * @returns {Promise<void> | void}
  */
 exports.up = (pgm) => {
-  // Add step_order column to existing booking_steps table
-  pgm.addColumn('booking_steps', {
-    step_order: { type: 'integer', notNull: false }
-  });
+  // Check if step_order column exists, if not add it
+  pgm.sql(`
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                     WHERE table_name = 'booking_steps' 
+                     AND column_name = 'step_order') THEN
+        ALTER TABLE booking_steps ADD COLUMN step_order integer;
+      END IF;
+    END $$;
+  `);
 
-  // Update existing rows with step_order values
+  // Update existing rows with step_order values (only if they don't have values)
   pgm.sql(`
     UPDATE booking_steps SET step_order = CASE 
       WHEN step_name = 'location' THEN 1
@@ -28,8 +35,18 @@ exports.up = (pgm) => {
     WHERE step_order IS NULL;
   `);
 
-  // Make step_order not null after updating existing data
-  pgm.alterColumn('booking_steps', 'step_order', { notNull: true });
+  // Make step_order not null (but only if the column was missing the constraint)
+  pgm.sql(`
+    DO $$ 
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'booking_steps' 
+                 AND column_name = 'step_order' 
+                 AND is_nullable = 'YES') THEN
+        ALTER TABLE booking_steps ALTER COLUMN step_order SET NOT NULL;
+      END IF;
+    END $$;
+  `);
 };
 
 /**

@@ -217,6 +217,9 @@ stages:
         echo "Running TypeScript build..."
         npx tsc -p tsconfig.prod.json
         
+        echo "Running database migrations..."
+        node scripts/migrate.js migrate --force
+        
         echo "Verifying build output..."
         if [ -d "dist" ]; then
           echo "✅ Build successful - dist directory created"
@@ -289,7 +292,7 @@ stages:
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node dist/app.js'
         deploymentMethod: 'zipDeploy'
-        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -SCM_COMMAND_IDLE_TIMEOUT 300 -WEBJOBS_IDLE_TIMEOUT 300'
+        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -SCM_COMMAND_IDLE_TIMEOUT 600 -WEBJOBS_IDLE_TIMEOUT 600'
       displayName: 'Deploy to Azure App Service'
     
     - script: |

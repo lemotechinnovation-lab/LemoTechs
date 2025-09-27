@@ -9,6 +9,8 @@ exports.shorthands = undefined;
  * @returns {Promise<void> | void}
  */
 exports.up = (pgm) => {
+  // PostGIS is already available in the container
+
   // Users table - Core user accounts
   pgm.createTable('users', {
     id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
@@ -17,7 +19,7 @@ exports.up = (pgm) => {
     password_hash: { type: 'varchar(255)' },
     first_name: { type: 'varchar(100)' },
     last_name: { type: 'varchar(100)' },
-    role: { type: 'varchar(20)', notNull: true, default: 'user' }, // user, driver, shop, admin
+    role: { type: 'varchar(20)', notNull: true, default: "'user'" },
     is_active: { type: 'boolean', default: true },
     email_verified: { type: 'boolean', default: false },
     phone_verified: { type: 'boolean', default: false },
@@ -38,12 +40,13 @@ exports.up = (pgm) => {
     vehicle_year: { type: 'integer' },
     vehicle_color: { type: 'varchar(30)' },
     vehicle_plate: { type: 'varchar(20)', unique: true },
-    vehicle_type: { type: 'varchar(20)', default: 'car' }, // car, bike, van
+    vehicle_type: { type: 'varchar(20)', default: "'car'" },
     insurance_number: { type: 'varchar(100)' },
     rating: { type: 'decimal(3,2)', default: 5.0 },
     total_trips: { type: 'integer', default: 0 },
     is_available: { type: 'boolean', default: true },
     is_verified: { type: 'boolean', default: false },
+
     current_location: { type: 'point' },
     last_location_update: { type: 'timestamp' },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
@@ -76,10 +79,10 @@ exports.up = (pgm) => {
   pgm.createTable('service_items', {
     id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
     name: { type: 'varchar(100)', notNull: true },
-    category: { type: 'varchar(50)', notNull: true }, // shoes, clothing, accessories
+    category: { type: 'varchar(50)', notNull: true },
     description: { type: 'text' },
     base_price: { type: 'decimal(10,2)', notNull: true },
-    estimated_time: { type: 'integer' }, // minutes
+    estimated_time: { type: 'integer' },
     icon: { type: 'varchar(100)' },
     is_active: { type: 'boolean', default: true },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
@@ -92,7 +95,7 @@ exports.up = (pgm) => {
     user_id: { type: 'uuid', references: 'users(id)', onDelete: 'CASCADE', notNull: true },
     driver_id: { type: 'uuid', references: 'drivers(id)', onDelete: 'SET NULL' },
     shop_id: { type: 'uuid', references: 'shops(id)', onDelete: 'SET NULL' },
-    status: { type: 'varchar(30)', notNull: true, default: 'pending' },
+    status: { type: 'varchar(30)', notNull: true, default: "'pending'" },
     pickup_location: { type: 'text', notNull: true },
     pickup_coords: { type: 'point' },
     delivery_location: { type: 'text' },
@@ -105,7 +108,7 @@ exports.up = (pgm) => {
     actual_delivery_time: { type: 'timestamp' },
     special_instructions: { type: 'text' },
     contact_phone: { type: 'varchar(20)' },
-    rating: { type: 'integer' }, // 1-5 stars
+    rating: { type: 'integer' },
     feedback: { type: 'text' },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
     updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
@@ -115,8 +118,8 @@ exports.up = (pgm) => {
   pgm.createTable('payment_methods', {
     id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
     user_id: { type: 'uuid', references: 'users(id)', onDelete: 'CASCADE', notNull: true },
-    type: { type: 'varchar(20)', notNull: true }, // card, mobile, cash
-    provider: { type: 'varchar(50)' }, // stripe, payfast
+    type: { type: 'varchar(20)', notNull: true },
+    provider: { type: 'varchar(50)' },
     external_id: { type: 'varchar(255)' },
     last_four: { type: 'varchar(4)' },
     expiry_month: { type: 'integer' },
@@ -134,9 +137,9 @@ exports.up = (pgm) => {
     user_id: { type: 'uuid', references: 'users(id)', onDelete: 'CASCADE', notNull: true },
     payment_method_id: { type: 'uuid', references: 'payment_methods(id)', onDelete: 'SET NULL' },
     amount: { type: 'decimal(10,2)', notNull: true },
-    currency: { type: 'varchar(3)', default: 'ZAR' },
-    status: { type: 'varchar(20)', notNull: true }, // pending, completed, failed, refunded
-    provider: { type: 'varchar(50)', notNull: true }, // stripe, payfast, cash
+    currency: { type: 'varchar(3)', default: "'ZAR'" },
+    status: { type: 'varchar(20)', notNull: true },
+    provider: { type: 'varchar(50)', notNull: true },
     external_transaction_id: { type: 'varchar(255)' },
     provider_response: { type: 'jsonb' },
     processed_at: { type: 'timestamp' },
@@ -178,7 +181,7 @@ exports.up = (pgm) => {
     size: { type: 'bigint', notNull: true },
     path: { type: 'text', notNull: true },
     url: { type: 'text' },
-    upload_type: { type: 'varchar(50)' }, // profile, booking, verification
+    upload_type: { type: 'varchar(50)' },
     related_id: { type: 'uuid' },
     uploaded_by: { type: 'uuid', references: 'users(id)', onDelete: 'SET NULL' },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
@@ -190,9 +193,24 @@ exports.up = (pgm) => {
   pgm.createIndex('users', 'firebase_uid');
   pgm.createIndex('drivers', 'user_id');
   pgm.createIndex('drivers', 'is_available');
-  pgm.createIndex('drivers', 'current_location', { method: 'gist' });
+  // Only create spatial indexes if PostGIS is available
+  pgm.sql(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+        CREATE INDEX drivers_current_location_index ON drivers USING gist (current_location);
+      END IF;
+    END $$;
+  `);
   pgm.createIndex('shops', 'user_id');
-  pgm.createIndex('shops', 'location', { method: 'gist' });
+  pgm.sql(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+        CREATE INDEX shops_location_index ON shops USING gist (location);
+      END IF;
+    END $$;
+  `);
   pgm.createIndex('shops', 'is_active');
   pgm.createIndex('bookings', 'user_id');
   pgm.createIndex('bookings', 'driver_id');
@@ -225,4 +243,6 @@ exports.down = (pgm) => {
   pgm.dropTable('shops');
   pgm.dropTable('drivers');
   pgm.dropTable('users');
+
+  // Extensions are managed at the container level
 };

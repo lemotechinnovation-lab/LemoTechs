@@ -105,13 +105,9 @@ stages:
         cp -r dist ../deploy-package/
         
         echo "Creating deployment configuration..."
-        # Create .deployment file to bypass Oryx completely
+        # Create .deployment file with correct syntax
         echo "[config]" > ../deploy-package/.deployment
-        echo "SCM_DO_BUILD_DURING_DEPLOYMENT=false" >> ../deploy-package/.deployment
-        echo "ENABLE_ORYX_BUILD=false" >> ../deploy-package/.deployment
-        echo "WEBSITE_DISABLE_SCM_BUILD=true" >> ../deploy-package/.deployment
-        echo "WEBSITE_RUN_FROM_PACKAGE=0" >> ../deploy-package/.deployment
-        echo "COMMAND=node dist/app.js" >> ../deploy-package/.deployment
+        echo "command = node dist/app.js" >> ../deploy-package/.deployment
         
         echo "Copying essential files..."
         [ -f web.config ] && cp web.config ../deploy-package/
@@ -124,11 +120,22 @@ stages:
         echo "Verifying package.json for Node.js detection:"
         cat package.json | head -15
         
-        echo "Verifying dist directory:"
+        echo "Verifying dist directory and main file:"
         [ -d "dist" ] && ls -la dist/ | head -10
+        [ -f "dist/app.js" ] && echo "✅ Main app file exists: dist/app.js" || echo "❌ Main app file missing: dist/app.js"
         
         echo "Verifying deployment configuration:"
         [ -f ".deployment" ] && cat .deployment
+        
+        echo "Final package structure verification:"
+        echo "📁 Package root contents:"
+        ls -la
+        echo "📋 Required files checklist:"
+        [ -f "package.json" ] && echo "✅ package.json" || echo "❌ package.json"
+        [ -d "dist" ] && echo "✅ dist/" || echo "❌ dist/"
+        [ -f "dist/app.js" ] && echo "✅ dist/app.js" || echo "❌ dist/app.js"
+        [ -d "node_modules" ] && echo "✅ node_modules/" || echo "❌ node_modules/"
+        [ -f ".deployment" ] && echo "✅ .deployment" || echo "❌ .deployment"
       displayName: 'Prepare Oryx-compatible Package'
     
     - task: ArchiveFiles@2
@@ -190,6 +197,42 @@ stages:
               echo "Package to deploy: $(packageName)-$(Build.BuildId).zip"
             displayName: 'Pre-Deployment Check'
           
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "=== Pre-Deploy: Configuring App Service Environment ==="
+                
+                # Set essential environment variables and disable build BEFORE deployment
+                az webapp config appsettings set \
+                  --resource-group $(resourceGroupName) \
+                  --name $(backendAppName) \
+                  --settings \
+                    NODE_ENV="production" \
+                    PORT="8000" \
+                    DATABASE_URL="postgresql://lemotech_admin:SecureDB2024!Platform@lemotech-db-server.postgres.database.azure.com:5432/lemotech_innovations?sslmode=require" \
+                    JWT_SECRET="LemoTech2024!SecureJWT!Production!Key!9x8v7c6b5n4m3" \
+                    CORS_ORIGIN="*" \
+                    AUTO_MIGRATE="true" \
+                    SEED_TEST_DATA="false" \
+                    SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
+                    ENABLE_ORYX_BUILD="false" \
+                    WEBSITE_DISABLE_SCM_BUILD="true" \
+                    WEBSITE_RUN_FROM_PACKAGE="0" \
+                    WEBSITE_DISABLE_DEPLOYMENT_BUILD="true" \
+                    WEBSITE_NODE_DEFAULT_VERSION="20.x"
+                
+                # Set startup command explicitly
+                az webapp config set \
+                  --resource-group $(resourceGroupName) \
+                  --name $(backendAppName) \
+                  --startup-file "node dist/app.js"
+                
+                echo "✅ Environment variables and startup command configured before deployment"
+            displayName: 'Pre-Deploy: Configure Environment Settings'
+          
           - task: AzureWebApp@1
             inputs:
               azureSubscription: $(azureServiceConnection)
@@ -209,28 +252,7 @@ stages:
               scriptType: 'bash'
               scriptLocation: 'inlineScript'
               inlineScript: |
-                echo "=== Configuring App Service Environment ==="
-                
-                # Set essential environment variables and disable build completely
-                az webapp config appsettings set \
-                  --resource-group $(resourceGroupName) \
-                  --name $(backendAppName) \
-                  --settings \
-                    NODE_ENV="production" \
-                    PORT="8000" \
-                    DATABASE_URL="postgresql://lemotech_admin:SecureDB2024!Platform@lemotech-db-server.postgres.database.azure.com:5432/lemotech_innovations?sslmode=require" \
-                    JWT_SECRET="LemoTech2024!SecureJWT!Production!Key!9x8v7c6b5n4m3" \
-                    CORS_ORIGIN="*" \
-                    AUTO_MIGRATE="true" \
-                    SEED_TEST_DATA="false" \
-                    SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
-                    ENABLE_ORYX_BUILD="false" \
-                    WEBSITE_DISABLE_SCM_BUILD="true" \
-                    WEBSITE_RUN_FROM_PACKAGE="0" \
-                    WEBSITE_DISABLE_DEPLOYMENT_BUILD="true" \
-                    WEBSITE_NODE_DEFAULT_VERSION="20.x"
-                
-                echo "✅ Environment variables configured"
+                echo "=== Post-Deploy: Verifying Configuration ==="
                 
                 # Verify Service Connector status
                 echo "=== Verifying Service Connector ==="

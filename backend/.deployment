@@ -1,5 +1,2 @@
 [config]
-SCM_DO_BUILD_DURING_DEPLOYMENT=false
-ENABLE_ORYX_BUILD=false
-WEBSITE_DISABLE_SCM_BUILD=true
-project = .
+command = node dist/app.js

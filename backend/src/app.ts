@@ -335,27 +335,25 @@ const startServer = async () => {
       Logger.info(`📡 SignalR Hub: http://localhost:${PORT}/hubs/bookingHub (Socket.IO)`);
       Logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       
-      // Keep deployment alive with periodic output (only for first 5 minutes)
-      if (process.env.NODE_ENV === 'production') {
-        let healthOutputCount = 0;
-        const maxHealthOutputs = 10; // 5 minutes worth (30s * 10 = 5min)
-        
-        const healthInterval = setInterval(() => {
-          if (healthOutputCount >= maxHealthOutputs) {
-            clearInterval(healthInterval);
-            console.log(`[${new Date().toISOString()}] LemoTech API - Health reporting completed, server running normally`);
-            return;
-          }
-          console.log(`[${new Date().toISOString()}] LemoTech API - Server running healthy (${healthOutputCount + 1}/${maxHealthOutputs})`);
-          healthOutputCount++;
-        }, 30000); // Output every 30 seconds for 5 minutes
-      }
-      
       Logger.info('🎉 STARTUP COMPLETE - Server ready to accept connections!');
       
-      // Signal deployment completion for Azure
+      // For Azure deployment, signal completion and then let the process run normally
       if (process.env.NODE_ENV === 'production') {
-        console.log('DEPLOYMENT_COMPLETE'); // Clear signal for Azure deployment detection
+        console.log('DEPLOYMENT_COMPLETE');
+        console.log('APPLICATION_READY');
+        console.log(`[${new Date().toISOString()}] LemoTech API - Server fully initialized and ready`);
+        
+        // Only output health status for first 2 minutes, then go quiet
+        let healthCount = 0;
+        const healthInterval = setInterval(() => {
+          healthCount++;
+          console.log(`[${new Date().toISOString()}] Health check ${healthCount}/4 - Server operational`);
+          
+          if (healthCount >= 4) { // 4 * 30s = 2 minutes
+            clearInterval(healthInterval);
+            console.log(`[${new Date().toISOString()}] Health monitoring complete - Server running in background`);
+          }
+        }, 30000);
       }
     });
   } catch (error) {

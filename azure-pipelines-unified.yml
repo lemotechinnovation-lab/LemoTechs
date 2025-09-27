@@ -274,14 +274,14 @@ stages:
         mkdir -p deploy-package
         cd deploy-package
         
-        # Create clean package.json for production
+        # Create clean package.json for production (app.js will be in root)
         cat > package.json << 'EOF'
         {
           "name": "lemotech-backend",
           "version": "1.0.0",
-          "main": "dist/app.js",
+          "main": "app.js",
           "scripts": {
-            "start": "node dist/app.js"
+            "start": "node app.js"
           },
           "engines": {
             "node": ">=18.0.0"
@@ -298,15 +298,17 @@ stages:
           fs.writeFileSync('package.json', JSON.stringify(deployPkg, null, 2));
         "
         
-        echo "Step 5: Copy built files and runtime necessities..."
-        # Copy built application
-        cp -r ../staging-backend/dist ./
+        echo "Step 5: Copy built files directly to wwwroot (extract dist contents)..."
+        # Copy built application files DIRECTLY (not in dist folder)
+        cp -r ../staging-backend/dist/* ./
         
-        # Verify dist folder was copied correctly
-        if [ -f "dist/app.js" ]; then
-          echo "✅ dist/app.js successfully copied to deployment package"
+        # Verify app.js is in root of deployment package
+        if [ -f "app.js" ]; then
+          echo "✅ app.js successfully copied to deployment package root"
+          echo "Main app files:"
+          ls -la *.js | head -10
         else
-          echo "❌ CRITICAL: dist/app.js missing from deployment package!"
+          echo "❌ CRITICAL: app.js missing from deployment package root!"
           echo "Contents of deployment package:"
           ls -la
           echo "Contents of staging-backend dist:"
@@ -327,9 +329,9 @@ stages:
         npm install --production --legacy-peer-deps
         
         echo "Step 7: Creating deployment configuration..."
-        # Create deployment configuration  
+        # Create deployment configuration (app.js is now in root)
         echo "[config]" > .deployment
-        echo "command = node dist/app.js" >> .deployment
+        echo "command = node app.js" >> .deployment
         
         # Copy web.config if exists
         [ -f ../backend/web.config ] && cp ../backend/web.config ./
@@ -371,7 +373,7 @@ stages:
         resourceGroupName: 'lemotech-platform'
         package: '$(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
-        startUpCommand: 'node dist/app.js'
+        startUpCommand: 'node app.js'
         deploymentMethod: 'zipDeploy'
         appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -SCM_COMMAND_IDLE_TIMEOUT 1200 -WEBJOBS_IDLE_TIMEOUT 1200 -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
       displayName: 'Deploy to Azure App Service'

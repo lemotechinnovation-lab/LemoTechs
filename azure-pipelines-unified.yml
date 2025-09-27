@@ -384,8 +384,29 @@ stages:
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node app.js'
         deploymentMethod: 'zipDeploy'
-        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -SCM_COMMAND_IDLE_TIMEOUT 1200 -WEBJOBS_IDLE_TIMEOUT 1200 -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
+        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
       displayName: 'Deploy to Azure App Service'
+    
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Configuring Azure App Service Timeout Settings ==="
+          
+          # Set timeout settings directly via Azure CLI
+          az webapp config appsettings set \
+            --resource-group lemotech-platform \
+            --name lemotech-api-backend \
+            --settings \
+              SCM_COMMAND_IDLE_TIMEOUT=1200 \
+              WEBJOBS_IDLE_TIMEOUT=1200 \
+              WEBSITE_TIME_ZONE="UTC" \
+              WEBSITE_HTTPLOGGING_RETENTION_DAYS=3
+          
+          echo "✅ Timeout settings configured: 1200 seconds (20 minutes)"
+      displayName: 'Configure App Service Timeouts'
     
     - script: |
         echo "=== Backend Health Check ==="

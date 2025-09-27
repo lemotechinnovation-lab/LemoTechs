@@ -12,13 +12,9 @@ exports.up = (pgm) => {
   // Booking steps - Multi-step booking process tracking
   pgm.createTable('booking_steps', {
     id: { type: 'uuid', primaryKey: true, default: pgm.func('gen_random_uuid()') },
-    booking_id: { type: 'uuid', references: 'bookings(id)', onDelete: 'CASCADE', notNull: true },
-    step_number: { type: 'integer', notNull: true },
-    step_name: { type: 'varchar(50)', notNull: true }, // pickup, cleaning, delivery
-    status: { type: 'varchar(20)', notNull: true, default: 'pending' }, // pending, in_progress, completed, failed
-    started_at: { type: 'timestamp' },
-    completed_at: { type: 'timestamp' },
-    notes: { type: 'text' },
+    step_name: { type: 'varchar(50)', notNull: true, unique: true },
+    step_order: { type: 'integer', notNull: true },
+    description: { type: 'text' },
     created_at: { type: 'timestamp', default: pgm.func('current_timestamp') },
     updated_at: { type: 'timestamp', default: pgm.func('current_timestamp') }
   });

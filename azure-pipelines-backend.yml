@@ -105,10 +105,12 @@ stages:
         cp -r dist ../deploy-package/
         
         echo "Creating deployment configuration..."
-        # Create .deployment file to bypass Oryx
+        # Create .deployment file to bypass Oryx completely
         echo "[config]" > ../deploy-package/.deployment
         echo "SCM_DO_BUILD_DURING_DEPLOYMENT=false" >> ../deploy-package/.deployment
         echo "ENABLE_ORYX_BUILD=false" >> ../deploy-package/.deployment
+        echo "WEBSITE_DISABLE_SCM_BUILD=true" >> ../deploy-package/.deployment
+        echo "WEBSITE_RUN_FROM_PACKAGE=0" >> ../deploy-package/.deployment
         echo "COMMAND=node dist/app.js" >> ../deploy-package/.deployment
         
         echo "Copying essential files..."
@@ -198,7 +200,7 @@ stages:
               runtimeStack: 'NODE|20-lts'
               startUpCommand: 'node dist/app.js'
               deploymentMethod: 'zipDeploy'
-              appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0'
+              appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true'
             displayName: 'Deploy to Azure App Service'
           
           - task: AzureCLI@2
@@ -225,7 +227,8 @@ stages:
                     ENABLE_ORYX_BUILD="false" \
                     WEBSITE_DISABLE_SCM_BUILD="true" \
                     WEBSITE_RUN_FROM_PACKAGE="0" \
-                    WEBSITE_DISABLE_DEPLOYMENT_BUILD="true"
+                    WEBSITE_DISABLE_DEPLOYMENT_BUILD="true" \
+                    WEBSITE_NODE_DEFAULT_VERSION="20.x"
                 
                 echo "✅ Environment variables configured"
                 

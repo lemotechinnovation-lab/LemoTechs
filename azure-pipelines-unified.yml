@@ -231,39 +231,18 @@ stages:
       displayName: 'Build Backend'
     
     - script: |
-        echo "=== Creating Deployment Package ==="
-        mkdir -p deploy-package
-        cd backend
-        
-        # Copy package.json and create clean version
-        cp package.json ../deploy-package/
-        cd ../deploy-package
-        
-        # Create clean package.json for deployment
-        node -e "
-          const fs = require('fs');
-          const original = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const clean = {
-            name: original.name,
-            version: original.version,
-            main: 'dist/app.js',
-            scripts: {
-              start: 'node dist/app.js'
-            },
-            engines: original.engines,
-            dependencies: original.dependencies
-          };
-          fs.writeFileSync('package.json', JSON.stringify(clean, null, 2));
-        "
+        echo "=== Creating Clean Backend Deployment Package ==="
         
         echo "Step 1: Copy BACKEND files to staging folder..."
-        cd ../backend
+        cd backend
         mkdir -p ../staging-backend
         
         # Copy ONLY backend source files (exclude node_modules, dist, etc.)
+        echo "Copying backend source files..."
         cp package.json ../staging-backend/
         cp migrate.json ../staging-backend/ || echo "migrate.json not found"
-        cp tsconfig.prod.json ../staging-backend/ || cp tsconfig.json ../staging-backend/
+        cp tsconfig.json ../staging-backend/
+        cp tsconfig.prod.json ../staging-backend/ || echo "tsconfig.prod.json not found"
         cp -r src ../staging-backend/
         cp -r scripts ../staging-backend/ || echo "scripts not found"
         [ -f web.config ] && cp web.config ../staging-backend/
@@ -273,10 +252,21 @@ stages:
         npm install --legacy-peer-deps
         npm run build
         
+        # Verify build succeeded
+        if [ -f "dist/app.js" ]; then
+          echo "✅ Build successful - dist/app.js found"
+          ls -la dist/
+        else
+          echo "❌ Build failed - dist/app.js not found"
+          echo "Contents of current directory:"
+          ls -la
+          exit 1
+        fi
+        
         echo "Step 3: Run migrations to ensure database is ready..."
         node scripts/migrate.js migrate --force || echo "Migrations completed or already applied"
         
-        echo "Step 4: Clean and create final deployment package for wwwroot..."
+        echo "Step 4: Create clean deployment package (for wwwroot)..."
         cd ..
         
         # Clean any existing deployment package
@@ -284,9 +274,45 @@ stages:
         mkdir -p deploy-package
         cd deploy-package
         
-        echo "Copying ONLY built files and runtime necessities (NO node_modules, NO frontend/admin files)..."
+        # Create clean package.json for production
+        cat > package.json << 'EOF'
+        {
+          "name": "lemotech-backend",
+          "version": "1.0.0",
+          "main": "dist/app.js",
+          "scripts": {
+            "start": "node dist/app.js"
+          },
+          "engines": {
+            "node": ">=18.0.0"
+          }
+        }
+        EOF
+        
+        # Copy dependencies from staging package.json
+        node -e "
+          const fs = require('fs');
+          const stagingPkg = JSON.parse(fs.readFileSync('../staging-backend/package.json', 'utf8'));
+          const deployPkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          deployPkg.dependencies = stagingPkg.dependencies;
+          fs.writeFileSync('package.json', JSON.stringify(deployPkg, null, 2));
+        "
+        
+        echo "Step 5: Copy built files and runtime necessities..."
         # Copy built application
         cp -r ../staging-backend/dist ./
+        
+        # Verify dist folder was copied correctly
+        if [ -f "dist/app.js" ]; then
+          echo "✅ dist/app.js successfully copied to deployment package"
+        else
+          echo "❌ CRITICAL: dist/app.js missing from deployment package!"
+          echo "Contents of deployment package:"
+          ls -la
+          echo "Contents of staging-backend dist:"
+          ls -la ../staging-backend/dist/
+          exit 1
+        fi
         
         # Copy runtime migration files
         mkdir -p ./src/infrastructure
@@ -295,13 +321,12 @@ stages:
         # Copy runtime configuration and scripts
         cp ../staging-backend/migrate.json ./
         cp -r ../staging-backend/scripts ./
-        cp ../staging-backend/package.json ./
         [ -f ../staging-backend/web.config ] && cp ../staging-backend/web.config ./
         
-        echo "Step 5: Install fresh production dependencies for deployment..."
+        echo "Step 6: Install fresh production dependencies for deployment..."
         npm install --production --legacy-peer-deps
         
-        echo "Step 6: Creating deployment configuration..."
+        echo "Step 7: Creating deployment configuration..."
         # Create deployment configuration  
         echo "[config]" > .deployment
         echo "command = node dist/app.js" >> .deployment
@@ -309,19 +334,22 @@ stages:
         # Copy web.config if exists
         [ -f ../backend/web.config ] && cp ../backend/web.config ./
         
-        echo "Step 7: Verify deployment package (BACKEND ONLY)..."
-        echo "=== Deployment Package Contents ==="
+        echo "Step 8: Verify deployment package (BACKEND ONLY)..."
+        echo "=== Final Deployment Package Contents ==="
         echo "Main files:"
         ls -la
         echo ""
-        echo "Dist folder contents:"
+        echo "Dist folder contents (should contain app.js):"
         ls -la dist/ | head -10
         echo ""
-        echo "Checking for unwanted files (should be empty):"
+        echo "Final verification - dist/app.js exists:"
+        [ -f "dist/app.js" ] && echo "✅ dist/app.js EXISTS" || echo "❌ dist/app.js MISSING"
+        echo ""
+        echo "Checking for unwanted files (should be 0):"
         echo "Frontend files:" $(find . -name "*frontend*" -o -name "*admin*" 2>/dev/null | wc -l)
         echo "Source TS files:" $(find . -name "*.ts" -not -path "./node_modules/*" | wc -l)  
         echo ""
-        echo "✅ BACKEND-ONLY deployment package verified!"
+        echo "✅ BACKEND-ONLY deployment package verified and ready!"
         
         echo "✅ Deployment package created!"
       displayName: 'Prepare Deployment Package'

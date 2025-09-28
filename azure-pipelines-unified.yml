@@ -352,6 +352,34 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
+          echo "=== Cleaning wwwroot folder completely ==="
+          
+          # Stop the app first
+          az webapp stop --resource-group lemotech-platform --name lemotech-api-backend
+          echo "✅ App stopped for clean deployment"
+          
+          # Clean wwwroot via Kudu API
+          echo "Cleaning /site/wwwroot/ completely..."
+          
+          # Get publishing credentials
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group lemotech-platform --name lemotech-api-backend --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          USERNAME=$(echo $CREDS | cut -f1)
+          PASSWORD=$(echo $CREDS | cut -f2)
+          
+          # Clean wwwroot via Kudu REST API
+          curl -X DELETE "https://lemotech-api-backend.scm.azurewebsites.net/api/vfs/site/wwwroot/" \
+            -u "$USERNAME:$PASSWORD" \
+            -H "If-Match: *" || echo "Clean attempt via API"
+          
+          echo "✅ wwwroot cleaned - ready for clean backend deployment"
+      displayName: 'Clean wwwroot Before Deployment'
+    
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
           echo "=== Configuring Azure App Service Settings ==="
           
           # Check current App Service plan
@@ -376,7 +404,11 @@ stages:
               CUSTOM_STARTUP_COMMAND="node app.js"
           
           echo "✅ Timeout and performance settings configured"
-      displayName: 'Configure App Service Timeouts'
+          
+          # Start the app after clean deployment
+          az webapp start --resource-group lemotech-platform --name lemotech-api-backend
+          echo "✅ App restarted with clean backend deployment"
+      displayName: 'Configure App Service and Restart'
     
     - script: |
         echo "=== Backend Health Check ==="

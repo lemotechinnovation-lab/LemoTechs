@@ -62,33 +62,34 @@ stages:
           DEPLOY_BACKEND=true
         fi
         
-        # Check for frontend changes
-        if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
-          echo "🔄 Frontend changes detected!"
-          DEPLOY_FRONTEND=true
-        fi
+        # DISABLED: Frontend and admin builds are failing - focus on backend only
+        # if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
+        #   echo "🔄 Frontend changes detected!"
+        #   DEPLOY_FRONTEND=true
+        # fi
         
-        # Check for admin dashboard changes
-        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
-          echo "🔄 Admin dashboard changes detected!"
-          DEPLOY_ADMIN=true
-        fi
+        # if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
+        #   echo "🔄 Admin dashboard changes detected!"
+        #   DEPLOY_ADMIN=true
+        # fi
         
-        # Check for template changes (affects all)
+        echo "🔄 Frontend and Admin deployments temporarily disabled - backend only"
+        
+        # Template changes only affect backend for now
         if echo "$CHANGED_FILES" | grep -E "^templates/" > /dev/null; then
-          echo "🔄 Template changes detected - will deploy all applications!"
+          echo "🔄 Template changes detected - will deploy backend!"
           DEPLOY_BACKEND=true
-          DEPLOY_FRONTEND=true
-          DEPLOY_ADMIN=true
         fi
         
-        # Force deploy all if no specific changes detected (safety)
-        if [ "$DEPLOY_BACKEND" = false ] && [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_ADMIN" = false ]; then
-          echo "🔄 No specific changes detected - deploying all for safety!"
+        # Force deploy backend if no specific changes detected (safety)
+        if [ "$DEPLOY_BACKEND" = false ]; then
+          echo "🔄 No backend changes detected - deploying backend for safety!"
           DEPLOY_BACKEND=true
-          DEPLOY_FRONTEND=true
-          DEPLOY_ADMIN=true
         fi
+        
+        # Keep frontend/admin disabled for now
+        DEPLOY_FRONTEND=false
+        DEPLOY_ADMIN=false
         
         echo ""
         echo "=== Deployment Plan ==="
@@ -458,6 +459,9 @@ stages:
         echo "Installing dependencies..."
         npm ci
         
+        echo "Installing TypeScript globally for build..."
+        npm install -g typescript
+        
         echo "Building React application..."
         npm run build
         
@@ -507,6 +511,9 @@ stages:
         
         echo "Installing dependencies..."
         npm ci
+        
+        echo "Installing TypeScript globally for build..."
+        npm install -g typescript
         
         echo "Building admin dashboard..."
         npm run build

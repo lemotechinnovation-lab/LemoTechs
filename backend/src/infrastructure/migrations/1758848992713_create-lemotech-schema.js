@@ -19,6 +19,7 @@ exports.up = (pgm) => {
     password_hash: { type: 'varchar(255)' },
     first_name: { type: 'varchar(100)' },
     last_name: { type: 'varchar(100)' },
+    address: { type: 'text' },
     role: { type: 'varchar(20)', notNull: true, default: "'user'" },
     is_active: { type: 'boolean', default: true },
     email_verified: { type: 'boolean', default: false },

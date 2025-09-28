@@ -490,7 +490,7 @@ stages:
         app_location: '/frontend'
         output_location: 'dist'
         skip_app_build: true
-      displayName: 'Deploy to Azure Static Web Apps'
+      displayName: 'Deploy Frontend to Azure Static Web Apps'
 
   # Admin Dashboard Deployment
   - job: DeployAdmin
@@ -580,7 +580,7 @@ stages:
         app_location: '/admin-dashboard'
         output_location: 'dist'
         skip_app_build: true
-      displayName: 'Deploy Admin to Azure Static Web Apps'
+      displayName: 'Deploy Admin Dashboard to Azure Static Web Apps'
 
 - stage: DeploymentSummary
   displayName: 'Deployment Summary'

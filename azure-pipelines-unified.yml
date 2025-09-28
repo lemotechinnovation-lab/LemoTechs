@@ -21,6 +21,14 @@ variables:
     value: '20.x'
   - name: environmentName
     value: 'production'
+  - name: isProduction
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/master')]
+  - name: frontendUrl
+    value: $[if(eq(variables.isProduction, 'true'), 'https://lemotechinnovations.co.za', 'https://icy-wave-09632e003.1.azurestaticapps.net')]
+  - name: backendUrl  
+    value: $[if(eq(variables.isProduction, 'true'), 'https://api.lemotechinnovations.co.za', 'https://lemotech-api-backend.azurewebsites.net')]
+  - name: adminUrl
+    value: $[if(eq(variables.isProduction, 'true'), 'https://admin.lemotechinnovations.co.za', 'https://thankful-pond-0e9607803.1.azurestaticapps.net')]
 
 stages:
 - stage: DetectChanges
@@ -197,6 +205,8 @@ stages:
   - job: DeployBackend
     displayName: 'Deploy Backend API'
     condition: eq(variables.deployBackend, 'true')
+    variables:
+      deploymentUrl: '$(backendUrl)'
     steps:
     - script: |
         echo "=== Cleaning workspace for backend deployment ==="
@@ -215,6 +225,8 @@ stages:
     
     - script: |
         echo "=== Backend API Deployment ==="
+        echo "Deployment Target: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
         cd backend
         echo "Current directory: $(pwd)"
         echo "Node version: $(node --version)"
@@ -410,7 +422,12 @@ stages:
               WEBSITE_DYNAMIC_CACHE=0 \
               WEBSITE_LOCAL_CACHE_OPTION=Never \
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
-              CUSTOM_STARTUP_COMMAND="node app.js"
+              CUSTOM_STARTUP_COMMAND="node app.js" \
+              NODE_ENV="$(environmentName)" \
+              FRONTEND_URL="$(frontendUrl)" \
+              ADMIN_URL="$(adminUrl)" \
+              BACKEND_URL="$(backendUrl)" \
+              CORS_ORIGIN="$(frontendUrl),$(adminUrl)"
           
           echo "✅ Timeout and performance settings configured"
           
@@ -421,18 +438,20 @@ stages:
     
     - script: |
         echo "=== Backend Health Check ==="
+        echo "Checking backend health at: $(deploymentUrl)/health"
+        echo "Environment: $(environmentName)"
         sleep 60
-        
-        BACKEND_URL="https://lemotech-api-backend.azurewebsites.net"
         
         for i in {1..10}; do
           echo "Health check attempt $i/10..."
-          if curl -f -s -o /dev/null "$BACKEND_URL/health" 2>/dev/null; then
+          if curl -f -s -o /dev/null "$(deploymentUrl)/health" 2>/dev/null; then
             echo "✅ Backend is healthy!"
+            echo "Backend successfully deployed to: $(deploymentUrl)"
             break
           elif [ $i -eq 10 ]; then
-            echo "⚠️ Backend health check timeout"
+            echo "⚠️ Backend health check timeout for $(deploymentUrl)"
           else
+            echo "Backend not ready, waiting 30 seconds..."
             sleep 30
           fi
         done
@@ -443,6 +462,8 @@ stages:
     displayName: 'Deploy Frontend App'
     condition: eq(variables.deployFrontend, 'true')
     dependsOn: DeployBackend
+    variables:
+      deploymentUrl: '$(frontendUrl)'
     steps:
     - checkout: self
       displayName: 'Checkout Source Code'
@@ -454,15 +475,20 @@ stages:
     
     - script: |
         echo "=== Clean Frontend React Deployment ==="
+        echo "Deployment Target: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
         cd frontend
         
         echo "Step 1: Create production environment..."
+        # Create environment file based on deployment target
         cat > .env << EOF
-        VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
-        VITE_ENVIRONMENT=production
+        VITE_API_BASE_URL=$(backendUrl)
+        VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech - On-Demand Cleaning
         NODE_ENV=production
         EOF
+        
+        echo "Frontend will connect to: $(backendUrl)"
         
         echo "Step 2: Install all dependencies (including dev dependencies for build)..."
         npm install --legacy-peer-deps
@@ -524,6 +550,8 @@ stages:
     displayName: 'Deploy Admin Dashboard'
     condition: eq(variables.deployAdmin, 'true')
     dependsOn: DeployFrontend
+    variables:
+      deploymentUrl: '$(adminUrl)'
     steps:
     - checkout: self
       displayName: 'Checkout Source Code'
@@ -535,16 +563,21 @@ stages:
     
     - script: |
         echo "=== Clean Admin Dashboard React Deployment ==="
+        echo "Deployment Target: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
         cd admin-dashboard
         
         echo "Step 1: Create production environment..."
+        # Create environment file based on deployment target
         cat > .env << EOF
-        VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
-        VITE_ENVIRONMENT=production
+        VITE_API_BASE_URL=$(backendUrl)
+        VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech Admin Dashboard
         VITE_REQUIRE_AUTH=true
         NODE_ENV=production
         EOF
+        
+        echo "Admin will connect to: $(backendUrl)"
         
         echo "Step 2: Install all dependencies (including dev dependencies for build)..."
         npm install --legacy-peer-deps

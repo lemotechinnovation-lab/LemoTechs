@@ -1,0 +1,309 @@
+# Azure DevOps Pipeline for Development/QA Environment
+# This pipeline deploys to Azure services for development and testing
+
+trigger:
+  branches:
+    include:
+    - develop
+    - feature/*
+    - qa
+  paths:
+    exclude:
+    - "*.md"
+
+pool:
+  name: 'Default'
+
+variables:
+  - group: LemoTech-Dev-Variables
+  - name: nodeVersion
+    value: '20.x'
+  - name: environmentName
+    value: 'development'
+  - name: frontendUrl
+    value: 'https://lemotech-frontend-dev.azurestaticapps.net'
+  - name: backendUrl  
+    value: 'https://lemotech-api-dev.azurewebsites.net'
+  - name: adminUrl
+    value: 'https://lemotech-admin-dev.azurestaticapps.net'
+
+stages:
+- stage: DetectChanges
+  displayName: 'Detect Changes and Plan Deployment'
+  jobs:
+  - job: detectChanges
+    displayName: 'Detect Changes'
+    steps:
+    - script: |
+        echo "=== Change Detection for Development Environment ==="
+        echo "Branch: $(Build.SourceBranchName)"
+        echo "Commit: $(Build.SourceVersion)"
+        
+        # Check for changes in each component
+        if git diff --name-only HEAD~1 HEAD | grep -E '^backend/'; then
+          echo "##vso[task.setvariable variable=deployBackend;isOutput=true]true"
+          echo "Backend changes detected"
+        else
+          echo "##vso[task.setvariable variable=deployBackend;isOutput=true]false"
+          echo "No backend changes"
+        fi
+        
+        if git diff --name-only HEAD~1 HEAD | grep -E '^frontend/'; then
+          echo "##vso[task.setvariable variable=deployFrontend;isOutput=true]true"
+          echo "Frontend changes detected"
+        else
+          echo "##vso[task.setvariable variable=deployFrontend;isOutput=true]false"
+          echo "No frontend changes"
+        fi
+        
+        if git diff --name-only HEAD~1 HEAD | grep -E '^admin-dashboard/'; then
+          echo "##vso[task.setvariable variable=deployAdmin;isOutput=true]true"
+          echo "Admin changes detected"
+        else
+          echo "##vso[task.setvariable variable=deployAdmin;isOutput=true]false"
+          echo "No admin changes"
+        fi
+        
+        echo "Deployment Plan:"
+        echo "- Backend: $(deployBackend)"
+        echo "- Frontend: $(deployFrontend)"
+        echo "- Admin: $(deployAdmin)"
+      displayName: 'Detect Changes'
+      name: detectChanges
+
+- stage: DeployBackend
+  displayName: 'Deploy Backend API (Dev)'
+  dependsOn: DetectChanges
+  condition: and(succeeded(), eq(dependencies.DetectChanges.outputs['detectChanges.deployBackend'], 'true'))
+  jobs:
+  - job: DeployBackend
+    displayName: 'Deploy Backend to Azure App Service'
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Backend Deployment to Development Environment ==="
+        echo "Target: $(backendUrl)"
+        echo "Environment: $(environmentName)"
+        cd backend
+        
+        echo "Step 1: Install dependencies..."
+        npm install --legacy-peer-deps
+        
+        echo "Step 2: Create development environment file..."
+        cat > .env << EOF
+        NODE_ENV=$(environmentName)
+        PORT=8080
+        DATABASE_URL=$(DATABASE_URL_DEV)
+        JWT_SECRET=$(JWT_SECRET_DEV)
+        CORS_ORIGIN=$(frontendUrl),$(adminUrl)
+        FRONTEND_URL=$(frontendUrl)
+        ADMIN_URL=$(adminUrl)
+        BACKEND_URL=$(backendUrl)
+        AZURE_STORAGE_CONNECTION_STRING=$(AZURE_STORAGE_CONNECTION_STRING_DEV)
+        AZURE_STORAGE_CONTAINER_NAME=lemotech-dev
+        SENDGRID_API_KEY=$(SENDGRID_API_KEY_DEV)
+        FROM_EMAIL=noreply-dev@lemotechinnovations.co.za
+        EOF
+        
+        echo "Step 3: Run database migrations..."
+        npm run migrate:dev
+        
+        echo "Step 4: Build application..."
+        npm run build
+        
+        echo "Step 5: Create deployment package..."
+        zip -r ../backend-dev.zip . -x "node_modules/*" "*.log" "*.env.local"
+        
+        echo "✅ Backend deployment package ready for development!"
+      displayName: 'Build Backend'
+    
+    - task: AzureWebApp@1
+      inputs:
+        azureSubscription: '$(AZURE_SERVICE_CONNECTION_ID)'
+        appName: 'lemotech-api-dev'
+        package: 'backend-dev.zip'
+        deploymentMethod: 'zipDeploy'
+      displayName: 'Deploy to Azure App Service (Dev)'
+    
+    - script: |
+        echo "=== Backend Health Check (Dev) ==="
+        echo "Checking backend health at: $(backendUrl)/health"
+        
+        for i in {1..10}; do
+          if curl -f -s "$(backendUrl)/health" > /dev/null; then
+            echo "✅ Backend is healthy!"
+            break
+          elif [ $i -eq 10 ]; then
+            echo "⚠️ Backend health check timeout"
+          else
+            sleep 30
+          fi
+        done
+      displayName: 'Verify Backend Health (Dev)'
+
+- stage: DeployFrontend
+  displayName: 'Deploy Frontend (Dev)'
+  dependsOn: DeployBackend
+  condition: and(succeeded(), eq(dependencies.DetectChanges.outputs['detectChanges.deployFrontend'], 'true'))
+  jobs:
+  - job: DeployFrontend
+    displayName: 'Deploy Frontend App (Dev)'
+    variables:
+      deploymentUrl: '$(frontendUrl)'
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Frontend Deployment to Development Environment ==="
+        echo "Deployment Target: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
+        cd frontend
+        
+        echo "Step 1: Create development environment..."
+        cat > .env << EOF
+        VITE_API_BASE_URL=$(backendUrl)
+        VITE_ENVIRONMENT=$(environmentName)
+        VITE_APP_TITLE=LemoTech - On-Demand Cleaning (Dev)
+        NODE_ENV=development
+        EOF
+        
+        echo "Frontend will connect to: $(backendUrl)"
+        
+        echo "Step 2: Install dependencies..."
+        npm install --legacy-peer-deps
+        
+        echo "Step 3: Build React application..."
+        npm run build
+        
+        echo "Step 4: Verify build output..."
+        if [ -d "dist" ]; then
+          echo "✅ Frontend build successful!"
+          echo "Build contents:"
+          find dist/ -type f | head -10
+          echo "Total files: $(find dist/ -type f | wc -l)"
+        else
+          echo "❌ Frontend build failed!"
+          exit 1
+        fi
+        
+        echo "Step 5: Create deployment package..."
+        cd dist
+        zip -r ../frontend-dev.zip . -x "*.map"
+        cd ..
+        
+        echo "✅ Frontend deployment package ready for development!"
+      displayName: 'Build Frontend (Dev)'
+    
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_subscription: '$(AZURE_SERVICE_CONNECTION_ID)'
+        app_location: 'frontend'
+        output_location: 'dist'
+        skip_app_build: true
+      displayName: 'Deploy Frontend to Azure Static Web Apps (Dev)'
+
+- stage: DeployAdmin
+  displayName: 'Deploy Admin Dashboard (Dev)'
+  dependsOn: DeployFrontend
+  condition: and(succeeded(), eq(dependencies.DetectChanges.outputs['detectChanges.deployAdmin'], 'true'))
+  jobs:
+  - job: DeployAdmin
+    displayName: 'Deploy Admin Dashboard (Dev)'
+    variables:
+      deploymentUrl: '$(adminUrl)'
+    steps:
+    - checkout: self
+      displayName: 'Checkout Source Code'
+    
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(nodeVersion)
+      displayName: 'Install Node.js $(nodeVersion)'
+    
+    - script: |
+        echo "=== Admin Dashboard Deployment to Development Environment ==="
+        echo "Deployment Target: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
+        cd admin-dashboard
+        
+        echo "Step 1: Create development environment..."
+        cat > .env << EOF
+        VITE_API_BASE_URL=$(backendUrl)
+        VITE_ENVIRONMENT=$(environmentName)
+        VITE_APP_TITLE=LemoTech Admin Dashboard (Dev)
+        VITE_REQUIRE_AUTH=false
+        NODE_ENV=development
+        EOF
+        
+        echo "Admin will connect to: $(backendUrl)"
+        
+        echo "Step 2: Install dependencies..."
+        npm install --legacy-peer-deps
+        
+        echo "Step 3: Build React admin dashboard..."
+        npm run build
+        
+        echo "Step 4: Verify build output..."
+        if [ -d "dist" ]; then
+          echo "✅ Admin dashboard build successful!"
+          echo "Build contents:"
+          find dist/ -type f | head -10
+          echo "Total files: $(find dist/ -type f | wc -l)"
+        else
+          echo "❌ Admin dashboard build failed!"
+          exit 1
+        fi
+        
+        echo "Step 5: Create deployment package..."
+        cd dist
+        zip -r ../admin-dev.zip . -x "*.map"
+        cd ..
+        
+        echo "✅ Admin dashboard deployment package ready for development!"
+      displayName: 'Build Admin Dashboard (Dev)'
+    
+    - task: AzureStaticWebApp@0
+      inputs:
+        azure_subscription: '$(AZURE_SERVICE_CONNECTION_ID)'
+        app_location: 'admin-dashboard'
+        output_location: 'dist'
+        skip_app_build: true
+      displayName: 'Deploy Admin Dashboard to Azure Static Web Apps (Dev)'
+
+- stage: NotifyDeployment
+  displayName: 'Notify Deployment Status'
+  dependsOn: 
+  - DeployBackend
+  - DeployFrontend
+  - DeployAdmin
+  condition: always()
+  jobs:
+  - job: NotifyDeployment
+    displayName: 'Send Deployment Notifications'
+    steps:
+    - script: |
+        echo "=== Development Deployment Summary ==="
+        echo "Environment: $(environmentName)"
+        echo "Branch: $(Build.SourceBranchName)"
+        echo "Commit: $(Build.SourceVersion)"
+        echo ""
+        echo "Deployed Services:"
+        echo "- Backend API: $(backendUrl)"
+        echo "- Frontend: $(frontendUrl)"
+        echo "- Admin Dashboard: $(adminUrl)"
+        echo ""
+        echo "Deployment completed at: $(date)"
+      displayName: 'Deployment Summary'

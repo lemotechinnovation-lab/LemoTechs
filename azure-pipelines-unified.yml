@@ -24,6 +24,7 @@ variables:
       value: 'production'
     ${{ else }}:
       value: 'development'
+  # Production URLs use custom domain, development uses Azure defaults
   - name: frontendUrl
     ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
       value: 'https://lemotechinnovations.co.za'
@@ -39,6 +40,12 @@ variables:
       value: 'https://admin.lemotechinnovations.co.za'
     ${{ else }}:
       value: 'https://thankful-pond-0e9607803.1.azurestaticapps.net'
+  
+  # DNS settings for custom domain validation
+  - name: dnsZoneName
+    value: 'lemotechinnovations.co.za'
+  - name: dnsResourceGroup
+    value: 'lemotech-platform'
 
 stages:
 - stage: DetectChanges

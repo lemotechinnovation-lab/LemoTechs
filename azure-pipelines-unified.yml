@@ -62,34 +62,33 @@ stages:
           DEPLOY_BACKEND=true
         fi
         
-        # DISABLED: Frontend and admin builds are failing - focus on backend only
-        # if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
-        #   echo "🔄 Frontend changes detected!"
-        #   DEPLOY_FRONTEND=true
-        # fi
+        # Check for frontend changes
+        if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
+          echo "🔄 Frontend changes detected!"
+          DEPLOY_FRONTEND=true
+        fi
         
-        # if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
-        #   echo "🔄 Admin dashboard changes detected!"
-        #   DEPLOY_ADMIN=true
-        # fi
+        # Check for admin dashboard changes
+        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
+          echo "🔄 Admin dashboard changes detected!"
+          DEPLOY_ADMIN=true
+        fi
         
-        echo "🔄 Frontend and Admin deployments temporarily disabled - backend only"
-        
-        # Template changes only affect backend for now
+        # Check for template changes (affects all)
         if echo "$CHANGED_FILES" | grep -E "^templates/" > /dev/null; then
-          echo "🔄 Template changes detected - will deploy backend!"
+          echo "🔄 Template changes detected - will deploy all applications!"
           DEPLOY_BACKEND=true
+          DEPLOY_FRONTEND=true
+          DEPLOY_ADMIN=true
         fi
         
-        # Force deploy backend if no specific changes detected (safety)
-        if [ "$DEPLOY_BACKEND" = false ]; then
-          echo "🔄 No backend changes detected - deploying backend for safety!"
+        # Force deploy all if no specific changes detected (safety)
+        if [ "$DEPLOY_BACKEND" = false ] && [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_ADMIN" = false ]; then
+          echo "🔄 No specific changes detected - deploying all for safety!"
           DEPLOY_BACKEND=true
+          DEPLOY_FRONTEND=true
+          DEPLOY_ADMIN=true
         fi
-        
-        # Keep frontend/admin disabled for now
-        DEPLOY_FRONTEND=false
-        DEPLOY_ADMIN=false
         
         echo ""
         echo "=== Deployment Plan ==="
@@ -445,10 +444,10 @@ stages:
       displayName: 'Install Node.js $(nodeVersion)'
     
     - script: |
-        echo "=== Frontend Application Deployment ==="
+        echo "=== Clean Frontend React Deployment ==="
         cd frontend
         
-        # Create environment file
+        echo "Step 1: Create production environment..."
         cat > .env << EOF
         VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
         VITE_ENVIRONMENT=production
@@ -456,22 +455,33 @@ stages:
         NODE_ENV=production
         EOF
         
-        echo "Installing dependencies..."
-        npm ci
+        echo "Step 2: Install all dependencies (including dev dependencies for build)..."
+        npm install --legacy-peer-deps
         
-        echo "Installing TypeScript globally for build..."
-        npm install -g typescript
-        
-        echo "Building React application..."
+        echo "Step 3: Build React application..."
         npm run build
         
+        echo "Step 4: Verify build output..."
         if [ -d "dist" ]; then
           echo "✅ Frontend build successful!"
-          ls -la dist/
+          echo "Build contents:"
+          find dist/ -type f | head -10
+          echo "Total files: $(find dist/ -type f | wc -l)"
         else
           echo "❌ Frontend build failed!"
+          echo "Current directory contents:"
+          ls -la
           exit 1
         fi
+        
+        echo "Step 5: Create clean deployment package..."
+        cd dist
+        
+        # Create frontend dist zip
+        zip -r ../frontend-dist.zip . -x "*.map"
+        cd ..
+        
+        echo "✅ Frontend deployment package ready!"
       displayName: 'Build Frontend'
     
     - task: AzureStaticWebApp@0
@@ -497,10 +507,10 @@ stages:
       displayName: 'Install Node.js $(nodeVersion)'
     
     - script: |
-        echo "=== Admin Dashboard Deployment ==="
+        echo "=== Clean Admin Dashboard React Deployment ==="
         cd admin-dashboard
         
-        # Create environment file
+        echo "Step 1: Create production environment..."
         cat > .env << EOF
         VITE_API_BASE_URL=https://lemotech-api-backend.azurewebsites.net
         VITE_ENVIRONMENT=production
@@ -509,19 +519,17 @@ stages:
         NODE_ENV=production
         EOF
         
-        echo "Installing dependencies..."
-        npm ci
+        echo "Step 2: Install all dependencies (including dev dependencies for build)..."
+        npm install --legacy-peer-deps
         
-        echo "Installing TypeScript globally for build..."
-        npm install -g typescript
-        
-        echo "Building admin dashboard..."
+        echo "Step 3: Build React admin dashboard..."
         npm run build
         
+        echo "Step 4: Verify build output..."
         if [ -d "dist" ]; then
           echo "✅ Admin dashboard build successful!"
           
-          # Add security configuration
+          # Add security configuration for Static Web Apps
           cat > dist/staticwebapp.config.json << EOF
           {
             "routes": [
@@ -546,11 +554,24 @@ stages:
           }
           EOF
           
-          ls -la dist/
+          echo "Build contents:"
+          find dist/ -type f | head -10
+          echo "Total files: $(find dist/ -type f | wc -l)"
         else
           echo "❌ Admin dashboard build failed!"
+          echo "Current directory contents:"
+          ls -la
           exit 1
         fi
+        
+        echo "Step 5: Create clean deployment package..."
+        cd dist
+        
+        # Create admin dist zip
+        zip -r ../admin-dist.zip . -x "*.map"
+        cd ..
+        
+        echo "✅ Admin dashboard deployment package ready!"
       displayName: 'Build Admin Dashboard'
     
     - task: AzureStaticWebApp@0

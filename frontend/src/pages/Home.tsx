@@ -67,7 +67,7 @@ export const Home = () => {
     {
       icon: <Schedule sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,
       title: 'Fast Turnaround',
-      description: 'Quick and reliable service with 24-48 hour(s) standard delivery for most items.'
+      description: 'Quick and reliable service with 24-48 hour standard delivery for most items.'
     },
     {
       icon: <Security sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,

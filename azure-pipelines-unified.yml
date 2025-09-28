@@ -29,8 +29,15 @@ stages:
   - job: AnalyzeChanges
     displayName: 'Analyze Changed Files'
     steps:
+    - script: |
+        echo "=== Cleaning up workspace ==="
+        sudo chmod -R 777 . 2>/dev/null || echo "Permissions already correct"
+        rm -rf node_modules .git/index.lock 2>/dev/null || echo "No cleanup needed"
+      displayName: 'Pre-checkout Cleanup'
+      
     - checkout: self
       fetchDepth: 2
+      clean: true
       displayName: 'Checkout with History'
     
     - script: |
@@ -191,7 +198,14 @@ stages:
     displayName: 'Deploy Backend API'
     condition: eq(variables.deployBackend, 'true')
     steps:
+    - script: |
+        echo "=== Cleaning workspace for backend deployment ==="
+        sudo chmod -R 777 . 2>/dev/null || echo "Permissions OK"
+        rm -rf node_modules 2>/dev/null || echo "No cleanup needed"
+      displayName: 'Pre-deployment Cleanup'
+      
     - checkout: self
+      clean: true
       displayName: 'Checkout Source Code'
     
     - task: NodeTool@0

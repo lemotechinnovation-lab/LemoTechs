@@ -63,13 +63,13 @@ stages:
         fi
         
         # Check for frontend changes
-        if echo "$CHANGED_FILES" | grep -E "^(frontend/|azure-pipelines-frontend\.yml)" > /dev/null; then
+        if echo "$CHANGED_FILES" | grep -E "^(frontend/|src/|azure-pipelines-frontend\.yml)" > /dev/null; then
           echo "🔄 Frontend changes detected!"
           DEPLOY_FRONTEND=true
         fi
         
         # Check for admin dashboard changes
-        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|azure-pipelines-admin\.yml)" > /dev/null; then
+        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|src/|azure-pipelines-admin\.yml)" > /dev/null; then
           echo "🔄 Admin dashboard changes detected!"
           DEPLOY_ADMIN=true
         fi
@@ -82,13 +82,8 @@ stages:
           DEPLOY_ADMIN=true
         fi
         
-        # Force deploy all if no specific changes detected (safety)
-        if [ "$DEPLOY_BACKEND" = false ] && [ "$DEPLOY_FRONTEND" = false ] && [ "$DEPLOY_ADMIN" = false ]; then
-          echo "🔄 No specific changes detected - deploying all for safety!"
-          DEPLOY_BACKEND=true
-          DEPLOY_FRONTEND=true
-          DEPLOY_ADMIN=true
-        fi
+        # Let pipeline decide based on actual code changes
+        echo "🔄 Deployment will be based on actual code changes detected"
         
         echo ""
         echo "=== Deployment Plan ==="
@@ -459,18 +454,27 @@ stages:
         npm install --legacy-peer-deps
         
         echo "Step 3: Build React application..."
-        npm run build
+        echo "Running: npm run build"
+        npm run build 2>&1 || {
+          echo "❌ Build command failed! Exit code: $?"
+          echo "Build logs above - checking for specific errors..."
+          exit 1
+        }
         
         echo "Step 4: Verify build output..."
+        echo "Checking for dist directory..."
         if [ -d "dist" ]; then
           echo "✅ Frontend build successful!"
           echo "Build contents:"
           find dist/ -type f | head -10
           echo "Total files: $(find dist/ -type f | wc -l)"
         else
-          echo "❌ Frontend build failed!"
+          echo "❌ Frontend build failed - no dist directory created!"
           echo "Current directory contents:"
           ls -la
+          echo ""
+          echo "Checking for build errors in package.json scripts:"
+          grep -A 5 '"scripts"' package.json
           exit 1
         fi
         
@@ -523,15 +527,20 @@ stages:
         npm install --legacy-peer-deps
         
         echo "Step 3: Build React admin dashboard..."
-        npm run build
+        echo "Running: npm run build"
+        npm run build 2>&1 || {
+          echo "❌ Admin build command failed! Exit code: $?"
+          echo "Build logs above - checking for specific errors..."
+          exit 1
+        }
         
         echo "Step 4: Verify build output..."
+        echo "Checking for dist directory..."
         if [ -d "dist" ]; then
           echo "✅ Admin dashboard build successful!"
           
           # Add security configuration for Static Web Apps
-          cat > dist/staticwebapp.config.json << EOF
-          {
+          echo '{
             "routes": [
               {
                 "route": "/*",
@@ -551,8 +560,7 @@ stages:
               "X-Content-Type-Options": "nosniff",
               "Strict-Transport-Security": "max-age=31536000"
             }
-          }
-          EOF
+          }' > dist/staticwebapp.config.json
           
           echo "Build contents:"
           find dist/ -type f | head -10

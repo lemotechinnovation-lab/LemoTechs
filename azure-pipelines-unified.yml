@@ -20,15 +20,25 @@ variables:
   - name: nodeVersion
     value: '20.x'
   - name: environmentName
-    value: 'production'
-  - name: isProduction
-    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/master')]
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+      value: 'production'
+    ${{ else }}:
+      value: 'development'
   - name: frontendUrl
-    value: $[if(eq(variables.isProduction, 'true'), 'https://lemotechinnovations.co.za', 'https://icy-wave-09632e003.1.azurestaticapps.net')]
-  - name: backendUrl  
-    value: $[if(eq(variables.isProduction, 'true'), 'https://api.lemotechinnovations.co.za', 'https://lemotech-api-backend.azurewebsites.net')]
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+      value: 'https://lemotechinnovations.co.za'
+    ${{ else }}:
+      value: 'https://icy-wave-09632e003.1.azurestaticapps.net'
+  - name: backendUrl
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+      value: 'https://api.lemotechinnovations.co.za'
+    ${{ else }}:
+      value: 'https://lemotech-api-backend.azurewebsites.net'
   - name: adminUrl
-    value: $[if(eq(variables.isProduction, 'true'), 'https://admin.lemotechinnovations.co.za', 'https://thankful-pond-0e9607803.1.azurestaticapps.net')]
+    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+      value: 'https://admin.lemotechinnovations.co.za'
+    ${{ else }}:
+      value: 'https://thankful-pond-0e9607803.1.azurestaticapps.net'
 
 stages:
 - stage: DetectChanges

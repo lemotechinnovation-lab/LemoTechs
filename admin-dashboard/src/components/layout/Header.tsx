@@ -64,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, currentPage }) => {
   };
 
   const notifications = [
-    { id: 1, title: 'New booking request', time: '2 min ago', type: 'info' },
+    { id: 1, title: 'New booking requests', time: '2 min ago', type: 'info' },
     { id: 2, title: 'Driver completed delivery', time: '5 min ago', type: 'success' },
     { id: 3, title: 'Payment processed', time: '10 min ago', type: 'success' },
     { id: 4, title: 'System maintenance scheduled', time: '1 hour ago', type: 'warning' },

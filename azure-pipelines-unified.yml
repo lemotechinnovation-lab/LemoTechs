@@ -468,10 +468,19 @@ stages:
         npm install --legacy-peer-deps
         
         echo "Step 3: Build React application (skip TypeScript for deployment)..."
-        echo "Running: vite build (skip tsc for deployment)"
-        npx vite build 2>&1 || {
+        echo "Running: vite build from frontend directory"
+        
+        # Ensure we're in the frontend directory and vite is available
+        pwd
+        ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
+        
+        # Run vite build with explicit path
+        ./node_modules/.bin/vite build 2>&1 || {
           echo "❌ Vite build command failed! Exit code: $?"
-          echo "Build logs above - checking for specific errors..."
+          echo "Checking vite installation:"
+          ls -la node_modules/.bin/ | grep vite || echo "Vite binary not found"
+          echo "Checking vite package:"
+          ls -la node_modules/vite/ || echo "Vite package not found"
           exit 1
         }
         
@@ -541,10 +550,19 @@ stages:
         npm install --legacy-peer-deps
         
         echo "Step 3: Build React admin dashboard (skip TypeScript for deployment)..."
-        echo "Running: vite build (skip tsc for deployment)"
-        npx vite build 2>&1 || {
+        echo "Running: vite build from admin-dashboard directory"
+        
+        # Ensure we're in the admin directory and vite is available
+        pwd
+        ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
+        
+        # Run vite build with explicit path
+        ./node_modules/.bin/vite build 2>&1 || {
           echo "❌ Admin vite build command failed! Exit code: $?"
-          echo "Build logs above - checking for specific errors..."
+          echo "Checking vite installation:"
+          ls -la node_modules/.bin/ | grep vite || echo "Vite binary not found"
+          echo "Checking vite package:"
+          ls -la node_modules/vite/ || echo "Vite package not found"
           exit 1
         }
         

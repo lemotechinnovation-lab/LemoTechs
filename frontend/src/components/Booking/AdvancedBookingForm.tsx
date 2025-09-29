@@ -28,7 +28,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV2';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 interface AdvancedBookingFormProps {
   onSubmit: (bookingData: any) => void;

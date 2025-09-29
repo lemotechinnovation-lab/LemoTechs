@@ -528,7 +528,7 @@ stages:
     
     - task: Cache@2
       inputs:
-        key: 'npm | "$(Agent.OS)" | frontend/package.json | frontend/package-lock.json'
+        key: 'npm | "$(Agent.OS)" | frontend/package.json'
         path: frontend/node_modules
         restoreKeys: |
           npm | "$(Agent.OS)"

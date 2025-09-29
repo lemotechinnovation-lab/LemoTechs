@@ -601,6 +601,9 @@ stages:
         
         echo "=== POST-INSTALL DEBUG ==="
         echo "✅ npm install completed, checking results..."
+        echo "npm-install.log contents:"
+        cat npm-install.log || echo "No npm-install.log found"
+        echo ""
         echo "Directory contents after install:"
         ls -la
         echo "node_modules contents:"
@@ -759,6 +762,9 @@ stages:
         
         echo "=== POST-INSTALL DEBUG ==="
         echo "✅ npm install completed, checking results..."
+        echo "npm-install.log contents:"
+        cat npm-install.log || echo "No npm-install.log found"
+        echo ""
         echo "Directory contents after install:"
         ls -la
         echo "node_modules contents:"

@@ -64,8 +64,15 @@ stages:
       
     - checkout: self
       fetchDepth: 2
-      clean: true
+      clean: false
       displayName: 'Checkout with History'
+    
+    - script: |
+        echo "Manually cleaning repo to avoid permission issues..."
+        sudo rm -rf node_modules frontend/node_modules admin-dashboard/node_modules backend/node_modules || echo "node_modules cleanup done"
+        sudo rm -rf frontend/dist admin-dashboard/dist backend/dist || echo "dist cleanup done"
+        sudo chown -R $(whoami) . || echo "ownership fix done"
+      displayName: 'Manual Clean'
     
     - script: |
         echo "=== LemoTech Intelligent Deployment System ==="
@@ -234,8 +241,15 @@ stages:
       displayName: 'Pre-deployment Cleanup'
       
     - checkout: self
-      clean: true
+      clean: false
       displayName: 'Checkout Source Code'
+    
+    - script: |
+        echo "Fixing permissions before build..."
+        sudo chown -R $(whoami) . || echo "ownership fix done"
+        sudo rm -rf node_modules backend/node_modules || echo "node_modules cleanup done"
+        sudo rm -rf backend/dist || echo "dist cleanup done"
+      displayName: 'Fix Permissions & Clean'
     
     - task: NodeTool@0
       inputs:
@@ -485,7 +499,14 @@ stages:
       deploymentUrl: '$(frontendUrl)'
     steps:
     - checkout: self
+      clean: false
       displayName: 'Checkout Source Code'
+    
+    - script: |
+        echo "Fixing permissions before frontend build..."
+        sudo chown -R $(whoami) . || echo "ownership fix done"
+        sudo rm -rf frontend/node_modules frontend/dist || echo "frontend cleanup done"
+      displayName: 'Fix Permissions & Clean Frontend'
     
     - task: NodeTool@0
       inputs:
@@ -587,7 +608,14 @@ stages:
       deploymentUrl: '$(adminUrl)'
     steps:
     - checkout: self
+      clean: false
       displayName: 'Checkout Source Code'
+    
+    - script: |
+        echo "Fixing permissions before admin build..."
+        sudo chown -R $(whoami) . || echo "ownership fix done"
+        sudo rm -rf admin-dashboard/node_modules admin-dashboard/dist || echo "admin cleanup done"
+      displayName: 'Fix Permissions & Clean Admin'
     
     - task: NodeTool@0
       inputs:

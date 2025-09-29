@@ -507,8 +507,10 @@ stages:
         
         echo "Frontend will connect to: $(frontendUrl)"
         
-        echo "Step 2: Install all dependencies (including dev dependencies for build)..."
-        npm install --legacy-peer-deps
+        echo "Step 2: Clean and install all dependencies (including dev dependencies for build)..."
+        rm -rf node_modules package-lock.json
+        npm cache clean --force
+        npm install
         
         echo "Step 3: Build React application (skip TypeScript for deployment)..."
         echo "Running: vite build from frontend directory"
@@ -596,8 +598,10 @@ stages:
         
         echo "Admin will connect to: $(adminUrl)"
         
-        echo "Step 2: Install all dependencies (including dev dependencies for build)..."
-        npm install --legacy-peer-deps
+        echo "Step 2: Clean and install all dependencies (including dev dependencies for build)..."
+        rm -rf node_modules package-lock.json
+        npm cache clean --force
+        npm install
         
         echo "Step 3: Build React admin dashboard (skip TypeScript for deployment)..."
         echo "Running: vite build from admin-dashboard directory"

@@ -20,6 +20,7 @@
     "@microsoft/signalr": "^9.0.6",
     "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.15.10",
+    "@mui/system": "^5.15.10",
     "@mui/x-date-pickers": "^8.11.0",
     "@stripe/stripe-js": "^7.9.0",
     "date-fns": "^2.30.0",

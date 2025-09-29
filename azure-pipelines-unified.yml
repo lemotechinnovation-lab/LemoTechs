@@ -622,13 +622,33 @@ stages:
         fi
         echo "Vite version: $(npx vite --version || echo 'npx vite failed')"
 
+        # Show npm install log regardless of success/failure
+        echo "=== FINAL NPM INSTALL LOG REVIEW ==="
+        if [ -f npm-install.log ]; then
+          echo "npm-install.log file exists ($(wc -l < npm-install.log) lines):"
+          cat npm-install.log
+        else
+          echo "No npm-install.log file found"
+        fi
+        echo "=== END NPM INSTALL LOG REVIEW ==="
+
         # Build (prefer package.json script if present)
         if grep -q "\"build\"\s*:\s*\".*vite build" package.json; then
           echo "Running npm run build"
-          npm run build --if-present
+          npm run build --if-present 2>&1 | tee build.log || {
+            echo "❌ npm run build failed"
+            echo "Build log contents:"
+            cat build.log || echo "No build log"
+            exit 1
+          }
         else
           echo "Running npx vite build"
-          npx vite build
+          npx vite build 2>&1 | tee build.log || {
+            echo "❌ npx vite build failed"
+            echo "Build log contents:"
+            cat build.log || echo "No build log"
+            exit 1
+          }
         fi
 
         # Verify build output
@@ -639,6 +659,10 @@ stages:
           echo "❌ Frontend build failed: dist not found"
           echo "Workspace contents:"
           ls -la
+          echo "Checking for any build logs:"
+          cat build.log || echo "No build.log found"
+          echo "Final npm-install.log review:"
+          cat npm-install.log || echo "No npm-install.log found"
           exit 1
         fi
         

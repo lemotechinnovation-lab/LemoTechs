@@ -556,13 +556,27 @@ stages:
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
         # Prefer reproducible install under CI - require package-lock.json in repo
+        echo "Checking for package-lock.json..."
+        ls -la package*.json || echo "No package files found"
+        
         if [ -f package-lock.json ]; then
-          echo "Using package-lock.json -> npm ci"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm
+          echo "✅ Using package-lock.json -> npm ci"
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm || {
+            echo "❌ npm ci failed, checking npm logs..."
+            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+            exit 1
+          }
         else
-          echo "No package-lock.json; falling back to npm install"
-          npm install --legacy-peer-deps --unsafe-perm --no-audit --progress=false --unsafe-perm
+          echo "⚠️  No package-lock.json; falling back to npm install"
+          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm || {
+            echo "❌ npm install failed, checking npm logs..."
+            cat ~/.npm/_logs/*.log || echo "No npm logs found"  
+            exit 1
+          }
         fi
+        
+        echo "✅ Dependencies installed, checking node_modules..."
+        ls -la node_modules/.bin | head -10 || echo "No .bin directory"
 
         # Verify vite binary exists
         echo "Checking for vite"
@@ -669,11 +683,27 @@ stages:
         export NPM_CONFIG_PRODUCTION=false
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
+        echo "Checking for package-lock.json..."
+        ls -la package*.json || echo "No package files found"
+        
         if [ -f package-lock.json ]; then
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm
+          echo "✅ Using package-lock.json -> npm ci"
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm || {
+            echo "❌ npm ci failed, checking npm logs..."
+            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+            exit 1
+          }
         else
-          npm install --legacy-peer-deps --unsafe-perm --no-audit --progress=false --unsafe-perm
+          echo "⚠️  No package-lock.json; falling back to npm install"
+          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm || {
+            echo "❌ npm install failed, checking npm logs..."
+            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+            exit 1
+          }
         fi
+        
+        echo "✅ Dependencies installed, checking node_modules..."
+        ls -la node_modules/.bin | head -10 || echo "No .bin directory"
 
         # Make sure vite exists or install
         if ! npx vite --version >/dev/null 2>&1; then

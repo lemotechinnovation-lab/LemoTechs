@@ -205,7 +205,7 @@ const CleanerSignup = () => {
                   fontFamily: '"Plus Jakarta Sans", sans-serif'
                 }}
               >
-                Select Your Cleaning Services
+                Select Your Cleaning Service
               </Typography>
               <Grid container spacing={2}>
                 {serviceTypes.map((service) => (

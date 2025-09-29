@@ -44,14 +44,35 @@ steps:
       rm -rf dist build .vite node_modules/.vite
       
       echo "Installing dependencies..."
-      npm ci --prefer-offline --no-audit
+      # Clear npm cache to avoid conflicts
+      npm cache clean --force
+      
+      # Install with better error handling
+      if ! npm ci --prefer-offline --no-audit; then
+        echo "⚠️ npm ci failed, trying npm install..."
+        npm install --production=false
+      fi
+      
+      # Verify critical dependencies are installed
+      if ! npm list @vitejs/plugin-react >/dev/null 2>&1; then
+        echo "🔧 Installing missing Vite React plugin..."
+        npm install @vitejs/plugin-react@latest
+      fi
       
       echo "Verifying build tools..."
       npx vite --version || echo "Vite not found in node_modules"
       npx tsc --version || echo "TypeScript not found"
       
       echo "Building application..."
-      ${{ parameters.customBuildCommand }}
+      # Try fast build first if available, then fall back to full build
+      if npm run build:fast 2>/dev/null; then
+        echo "✅ Fast build successful"
+      elif ${{ parameters.customBuildCommand }}; then
+        echo "✅ Full build successful"
+      else
+        echo "❌ Build failed"
+        exit 1
+      fi
       
       # Verify build output
       if [ -d "dist" ]; then

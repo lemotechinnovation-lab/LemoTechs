@@ -19,9 +19,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: true,
+    sourcemap: false,
     minify: 'terser',
     target: 'es2015',
+    commonjsOptions: {
+      transformMixedEsModules: true
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -32,7 +35,7 @@ export default defineConfig({
           'router': ['react-router-dom'],
           'animation': ['framer-motion'],
           'charts': ['recharts'],
-          'firebase': ['firebase/app', 'firebase/auth'],
+          'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/analytics'],
           'utils': ['use-places-autocomplete']
         },
       },

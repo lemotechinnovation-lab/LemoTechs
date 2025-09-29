@@ -355,7 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentPage }) => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{ width: 12, height: 3, background: '#4CAF50', borderRadius: '1px' }} />
                   <Typography variant="caption" sx={{ color: '#4CAF50', fontSize: '0.7rem', fontWeight: 600 }}>
-                    Total Earnings
+                    Total Earning(s)
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

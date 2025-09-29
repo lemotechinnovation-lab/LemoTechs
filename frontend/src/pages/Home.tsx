@@ -62,7 +62,7 @@ export const Home = () => {
     {
       icon: <LocalLaundryService sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,
       title: 'Professional Cleaning',
-      description: 'Expert cleaning services using industry-leading techniques and eco-friendly solutions.'
+      description: 'Expert cleaning services using industry-leading techniques and eco-friendly solution(s).'
     },
     {
       icon: <Schedule sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,

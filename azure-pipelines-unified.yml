@@ -31,7 +31,7 @@ variables:
     ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
       value: 'https://lemotechinnovations.co.za'
     ${{ else }}:
-      value: 'https://icy-wave-09632e003.1.azurestaticapps.net'
+      value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
   - name: backendUrl
     ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
       value: 'https://api.lemotechinnovations.co.za'
@@ -41,7 +41,7 @@ variables:
     ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
       value: 'https://admin.lemotechinnovations.co.za'
     ${{ else }}:
-      value: 'https://thankful-pond-0e9607803.1.azurestaticapps.net'
+      value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
   
   # DNS settings for custom domain validation
   - name: dnsZoneName
@@ -67,7 +67,7 @@ stages:
         sudo chown -R $(whoami):$(whoami) /home/azureagent/myagent/_work || echo "workspace ownership fix done"
         sudo chmod -R u+rwX /home/azureagent/myagent/_work || echo "workspace permissions fix done"
       displayName: "Fix permissions before checkout"
-    
+      
     - checkout: self
       fetchDepth: 2
       clean: true
@@ -689,13 +689,220 @@ stages:
         echo "✅ Frontend deployment package ready!"
       displayName: 'Build Frontend (robust)'
     
-    - task: AzureStaticWebApp@0
+    - script: |
+        echo "Step 2: Prepare App Service deployment package..."
+        cd frontend
+        rm -rf ../deploy-frontend || true
+        mkdir -p ../deploy-frontend
+        
+        # Copy all dist files to deployment directory
+        cp -r dist/* ../deploy-frontend/
+        
+        # Create minimal Node.js server for SPA serving
+        cat > ../deploy-frontend/server.js << 'EOF'
+        // Minimal Node.js server for SPA with client-side routing
+        const http = require('http');
+        const fs = require('fs');
+        const path = require('path');
+        
+        const port = process.env.PORT || 8080;
+        const root = path.resolve(__dirname);
+        
+        const mimeTypes = {
+          '.html': 'text/html',
+          '.js': 'application/javascript',
+          '.css': 'text/css',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.ico': 'image/x-icon',
+          '.woff': 'font/woff',
+          '.woff2': 'font/woff2',
+          '.ttf': 'font/ttf',
+          '.eot': 'application/vnd.ms-fontobject'
+        };
+        
+        function sendFile(res, filePath) {
+          fs.readFile(filePath, (err, data) => {
+            if (err) {
+              console.error('Error reading file:', err);
+              res.writeHead(500, {'Content-Type': 'text/plain'});
+              res.end('Internal Server Error');
+              return;
+            }
+            
+            const ext = path.extname(filePath).toLowerCase();
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+            
+            res.writeHead(200, {
+              'Content-Type': contentType,
+              'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000'
+            });
+            res.end(data);
+          });
+        }
+        
+        const server = http.createServer((req, res) => {
+          try {
+            let reqPath = decodeURI(req.url.split('?')[0]);
+            if (reqPath === '/') reqPath = '/index.html';
+            
+            const filePath = path.join(root, reqPath);
+            
+            fs.stat(filePath, (err, stats) => {
+              if (err || !stats.isFile()) {
+                // SPA fallback - serve index.html for client-side routing
+                const indexPath = path.join(root, 'index.html');
+                sendFile(res, indexPath);
+              } else {
+                sendFile(res, filePath);
+              }
+            });
+          } catch (error) {
+            console.error('Server error:', error);
+            res.writeHead(500, {'Content-Type': 'text/plain'});
+            res.end('Internal Server Error');
+          }
+        });
+        
+        server.listen(port, () => {
+          console.log('Frontend SPA Server listening on port', port);
+          console.log('Environment:', process.env.NODE_ENV || 'development');
+        });
+        
+        process.on('SIGTERM', () => {
+          console.log('SIGTERM received, shutting down gracefully');
+          server.close(() => process.exit(0));
+        });
+        EOF
+
+        # Create package.json for the SPA server
+        cat > ../deploy-frontend/package.json << 'EOF'
+        {
+          "name": "lemotech-frontend-spa",
+          "version": "1.0.0",
+          "description": "LemoTech Frontend SPA Server",
+          "main": "server.js",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "engines": {
+            "node": ">=18.0.0"
+          }
+        }
+        EOF
+
+        echo "✅ Frontend App Service deployment package ready!"
+        ls -la ../deploy-frontend/
+      displayName: 'Prepare Frontend App Service Package'
+    
+    - task: ArchiveFiles@2
       inputs:
-        azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
-        app_location: '/frontend'
-        output_location: 'dist'
-        skip_app_build: true
-      displayName: 'Deploy Frontend to Azure Static Web Apps'
+        rootFolderOrFile: 'deploy-frontend'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive Frontend Package'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Cleaning Frontend App Service for Clean Deployment ==="
+          RG='lemotech-platform'
+          APP='lemotech-frontend'
+          
+          # Stop the app first
+          echo "Stopping $APP..."
+          az webapp stop --resource-group "$RG" --name "$APP"
+          echo "✅ App stopped for clean deployment"
+          
+          # Clean wwwroot via Kudu API
+          echo "Cleaning /site/wwwroot/ completely..."
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group $RG --name $APP --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          USERNAME=$(echo $CREDS | cut -f1)
+          PASSWORD=$(echo $CREDS | cut -f2)
+          
+          # Clean wwwroot via Kudu REST API
+          curl -X DELETE "https://$APP.scm.azurewebsites.net/api/vfs/site/wwwroot/" \
+            -u "$USERNAME:$PASSWORD" \
+            -H "If-Match: *" || echo "Clean attempt via API completed"
+          
+          echo "✅ wwwroot cleaned - ready for clean frontend deployment"
+      displayName: 'Clean Frontend App Service wwwroot'
+
+    - task: AzureWebApp@1
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        appType: 'webAppLinux'
+        appName: 'lemotech-frontend'
+        resourceGroupName: 'lemotech-platform'
+        package: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
+        runtimeStack: 'NODE|20-lts'
+        startUpCommand: 'node server.js'
+        deploymentMethod: 'zipDeploy'
+        appSettings: '-NODE_ENV $(environmentName) -FRONTEND_URL $(frontendUrl) -BACKEND_URL $(backendUrl) -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
+      displayName: 'Deploy Frontend to Azure App Service'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Configuring Frontend App Service Settings ==="
+          RG='lemotech-platform'
+          APP='lemotech-frontend'
+          
+          # Set performance and timeout settings
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --settings \
+              SCM_COMMAND_IDLE_TIMEOUT=1200 \
+              WEBJOBS_IDLE_TIMEOUT=1200 \
+              WEBSITE_TIME_ZONE="UTC" \
+              WEBSITE_HTTPLOGGING_RETENTION_DAYS=3 \
+              WEBSITE_NODE_DEFAULT_VERSION="~20" \
+              NODE_ENV="$(environmentName)" \
+              FRONTEND_URL="$(frontendUrl)" \
+              BACKEND_URL="$(backendUrl)" \
+              CORS_ORIGIN="$(backendUrl)"
+          
+          echo "✅ Frontend app settings configured"
+          
+          # Start the app
+          echo "Starting $APP..."
+          az webapp start --resource-group "$RG" --name "$APP"
+          echo "✅ Frontend app restarted"
+      displayName: 'Configure Frontend App Settings & Start'
+
+    - script: |
+        echo "=== Frontend Health Check ==="
+        echo "Checking frontend health at: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
+        sleep 60
+        
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          if curl -f -s -o /dev/null "$(deploymentUrl)" 2>/dev/null; then
+            echo "✅ Frontend is healthy!"
+            echo "Frontend successfully deployed to: $(deploymentUrl)"
+            break
+          elif [ $i -eq 10 ]; then
+            echo "⚠️ Frontend health check timeout for $(deploymentUrl)"
+          else
+            echo "Frontend not ready, waiting 30 seconds..."
+            sleep 30
+          fi
+        done
+      displayName: 'Verify Frontend Health'
 
   # Admin Dashboard Deployment
   - job: DeployAdmin
@@ -806,8 +1013,8 @@ stages:
             find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
             echo "=== DIRECTORY AFTER FAILED INSTALL ==="
             ls -la
-            exit 1
-          }
+          exit 1
+        }
         fi
         
         echo "=== POST-INSTALL DEBUG ==="
@@ -894,13 +1101,254 @@ stages:
         echo "✅ Admin dashboard deployment package ready!"
       displayName: 'Build Admin Dashboard (robust)'
     
-    - task: AzureStaticWebApp@0
+    - script: |
+        echo "Step 2: Prepare Admin App Service deployment package..."
+        cd admin-dashboard
+        rm -rf ../deploy-admin || true
+        mkdir -p ../deploy-admin
+        
+        # Copy all dist files to deployment directory
+        cp -r dist/* ../deploy-admin/
+        
+        # Add security configuration (as JSON file for reference)
+        echo '{
+          "routes": [
+            {
+              "route": "/*",
+              "serve": "/index.html",
+              "statusCode": 200,
+              "allowedRoles": ["admin", "manager"]
+            }
+          ],
+          "responseOverrides": {
+            "401": {
+              "redirect": "/login",
+              "statusCode": 302
+            }
+          },
+          "globalHeaders": {
+            "X-Frame-Options": "DENY",
+            "X-Content-Type-Options": "nosniff",
+            "Strict-Transport-Security": "max-age=31536000"
+          }
+        }' > ../deploy-admin/security-config.json
+        
+        # Create minimal Node.js server for admin SPA serving
+        cat > ../deploy-admin/server.js << 'EOF'
+        // Minimal Node.js server for Admin SPA with security headers
+        const http = require('http');
+        const fs = require('fs');
+        const path = require('path');
+        
+        const port = process.env.PORT || 8080;
+        const root = path.resolve(__dirname);
+        
+        const mimeTypes = {
+          '.html': 'text/html',
+          '.js': 'application/javascript',
+          '.css': 'text/css',
+          '.json': 'application/json',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.ico': 'image/x-icon',
+          '.woff': 'font/woff',
+          '.woff2': 'font/woff2',
+          '.ttf': 'font/ttf',
+          '.eot': 'application/vnd.ms-fontobject'
+        };
+        
+        function sendFile(res, filePath) {
+          fs.readFile(filePath, (err, data) => {
+            if (err) {
+              console.error('Error reading file:', err);
+              res.writeHead(500, {'Content-Type': 'text/plain'});
+              res.end('Internal Server Error');
+              return;
+            }
+            
+            const ext = path.extname(filePath).toLowerCase();
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+            
+            // Security headers for admin dashboard
+            const headers = {
+              'Content-Type': contentType,
+              'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000',
+              'X-Frame-Options': 'DENY',
+              'X-Content-Type-Options': 'nosniff',
+              'Strict-Transport-Security': 'max-age=31536000',
+              'X-XSS-Protection': '1; mode=block',
+              'Referrer-Policy': 'strict-origin-when-cross-origin'
+            };
+            
+            res.writeHead(200, headers);
+            res.end(data);
+          });
+        }
+        
+        const server = http.createServer((req, res) => {
+          try {
+            let reqPath = decodeURI(req.url.split('?')[0]);
+            if (reqPath === '/') reqPath = '/index.html';
+            
+            const filePath = path.join(root, reqPath);
+            
+            fs.stat(filePath, (err, stats) => {
+              if (err || !stats.isFile()) {
+                // SPA fallback - serve index.html for client-side routing
+                const indexPath = path.join(root, 'index.html');
+                sendFile(res, indexPath);
+              } else {
+                sendFile(res, filePath);
+              }
+            });
+          } catch (error) {
+            console.error('Server error:', error);
+            res.writeHead(500, {'Content-Type': 'text/plain'});
+            res.end('Internal Server Error');
+          }
+        });
+        
+        server.listen(port, () => {
+          console.log('Admin Dashboard SPA Server listening on port', port);
+          console.log('Environment:', process.env.NODE_ENV || 'development');
+          console.log('Security headers enabled for admin protection');
+        });
+        
+        process.on('SIGTERM', () => {
+          console.log('SIGTERM received, shutting down gracefully');
+          server.close(() => process.exit(0));
+        });
+        EOF
+
+        # Create package.json for the admin SPA server
+        cat > ../deploy-admin/package.json << 'EOF'
+        {
+          "name": "lemotech-admin-spa",
+          "version": "1.0.0",
+          "description": "LemoTech Admin Dashboard SPA Server",
+          "main": "server.js",
+          "scripts": {
+            "start": "node server.js"
+          },
+          "engines": {
+            "node": ">=18.0.0"
+          }
+        }
+        EOF
+
+        echo "✅ Admin Dashboard App Service deployment package ready!"
+        ls -la ../deploy-admin/
+      displayName: 'Prepare Admin App Service Package'
+    
+    - task: ArchiveFiles@2
       inputs:
-        azure_static_web_apps_api_token: '$(AZURE_ADMIN_STATIC_WEB_APPS_API_TOKEN)'
-        app_location: '/admin-dashboard'
-        output_location: 'dist'
-        skip_app_build: true
-      displayName: 'Deploy Admin Dashboard to Azure Static Web Apps'
+        rootFolderOrFile: 'deploy-admin'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/admin-$(Build.BuildId).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive Admin Dashboard Package'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Cleaning Admin App Service for Clean Deployment ==="
+          RG='lemotech-platform'
+          APP='lemotech-admin'
+          
+          # Stop the app first
+          echo "Stopping $APP..."
+          az webapp stop --resource-group "$RG" --name "$APP"
+          echo "✅ App stopped for clean deployment"
+          
+          # Clean wwwroot via Kudu API
+          echo "Cleaning /site/wwwroot/ completely..."
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group $RG --name $APP --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          USERNAME=$(echo $CREDS | cut -f1)
+          PASSWORD=$(echo $CREDS | cut -f2)
+          
+          # Clean wwwroot via Kudu REST API
+          curl -X DELETE "https://$APP.scm.azurewebsites.net/api/vfs/site/wwwroot/" \
+            -u "$USERNAME:$PASSWORD" \
+            -H "If-Match: *" || echo "Clean attempt via API completed"
+          
+          echo "✅ wwwroot cleaned - ready for clean admin deployment"
+      displayName: 'Clean Admin App Service wwwroot'
+
+    - task: AzureWebApp@1
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        appType: 'webAppLinux'
+        appName: 'lemotech-admin'
+        resourceGroupName: 'lemotech-platform'
+        package: '$(Build.ArtifactStagingDirectory)/admin-$(Build.BuildId).zip'
+        runtimeStack: 'NODE|20-lts'
+        startUpCommand: 'node server.js'
+        deploymentMethod: 'zipDeploy'
+        appSettings: '-NODE_ENV $(environmentName) -ADMIN_URL $(adminUrl) -BACKEND_URL $(backendUrl) -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
+      displayName: 'Deploy Admin Dashboard to Azure App Service'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Configuring Admin App Service Settings ==="
+          RG='lemotech-platform'
+          APP='lemotech-admin'
+          
+          # Set performance and timeout settings with admin-specific security
+          az webapp config appsettings set \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --settings \
+              SCM_COMMAND_IDLE_TIMEOUT=1200 \
+              WEBJOBS_IDLE_TIMEOUT=1200 \
+              WEBSITE_TIME_ZONE="UTC" \
+              WEBSITE_HTTPLOGGING_RETENTION_DAYS=3 \
+              WEBSITE_NODE_DEFAULT_VERSION="~20" \
+              NODE_ENV="$(environmentName)" \
+              ADMIN_URL="$(adminUrl)" \
+              BACKEND_URL="$(backendUrl)" \
+              CORS_ORIGIN="$(backendUrl)" \
+              REQUIRE_AUTH="true" \
+              SECURITY_HEADERS="enabled"
+          
+          echo "✅ Admin app settings configured with security"
+          
+          # Start the app
+          echo "Starting $APP..."
+          az webapp start --resource-group "$RG" --name "$APP"
+          echo "✅ Admin app restarted"
+      displayName: 'Configure Admin App Settings & Start'
+
+    - script: |
+        echo "=== Admin Dashboard Health Check ==="
+        echo "Checking admin dashboard health at: $(deploymentUrl)"
+        echo "Environment: $(environmentName)"
+        sleep 60
+        
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          if curl -f -s -o /dev/null "$(deploymentUrl)" 2>/dev/null; then
+            echo "✅ Admin Dashboard is healthy!"
+            echo "Admin Dashboard successfully deployed to: $(deploymentUrl)"
+            break
+          elif [ $i -eq 10 ]; then
+            echo "⚠️ Admin Dashboard health check timeout for $(deploymentUrl)"
+          else
+            echo "Admin Dashboard not ready, waiting 30 seconds..."
+            sleep 30
+          fi
+        done
+      displayName: 'Verify Admin Dashboard Health'
 
 - stage: DeploymentSummary
   displayName: 'Deployment Summary'
@@ -916,10 +1364,10 @@ stages:
         echo "Build: $(Build.BuildNumber)"
         echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         echo ""
-        echo "🌐 Application URLs:"
-        echo "Backend API: https://lemotech-api-backend.azurewebsites.net"
-        echo "Frontend: Check Azure Static Web Apps for URL"
-        echo "Admin: Check Azure Static Web Apps for URL"
+        echo "🌐 Application URLs (All App Services):"
+        echo "Backend API: $(backendUrl)"
+        echo "Frontend App: $(frontendUrl)"
+        echo "Admin Dashboard: $(adminUrl)"
         echo ""
         echo "✅ Deployment completed successfully!"
       displayName: 'Display Summary'

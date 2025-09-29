@@ -551,6 +551,18 @@ stages:
         
         echo "Frontend will connect to: $(frontendUrl)"
 
+        # Debug environment before npm install
+        echo "=== PRE-INSTALL DEBUG ==="
+        echo "Current directory: $(pwd)"
+        echo "User: $(whoami)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        echo "NPM config:"
+        npm config list
+        echo "Directory contents:"
+        ls -la
+        echo "=== END PRE-INSTALL DEBUG ==="
+
         # Ensure devDependencies ARE installed for build
         export NPM_CONFIG_PRODUCTION=false
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
@@ -561,22 +573,41 @@ stages:
         
         if [ -f package-lock.json ]; then
           echo "✅ Using package-lock.json -> npm ci"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm || {
-            echo "❌ npm ci failed, checking npm logs..."
-            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+          echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+            echo "❌ npm ci failed with exit code: $?"
+            echo "=== NPM CI OUTPUT ==="
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
             exit 1
           }
         else
           echo "⚠️  No package-lock.json; falling back to npm install"
-          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm || {
-            echo "❌ npm install failed, checking npm logs..."
-            cat ~/.npm/_logs/*.log || echo "No npm logs found"  
+          echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+            echo "❌ npm install failed with exit code: $?"
+            echo "=== NPM INSTALL OUTPUT ==="
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
             exit 1
           }
         fi
         
-        echo "✅ Dependencies installed, checking node_modules..."
+        echo "=== POST-INSTALL DEBUG ==="
+        echo "✅ npm install completed, checking results..."
+        echo "Directory contents after install:"
+        ls -la
+        echo "node_modules contents:"
+        ls -la node_modules/ | head -20 || echo "No node_modules directory"
+        echo "node_modules/.bin contents:"
         ls -la node_modules/.bin | head -10 || echo "No .bin directory"
+        echo "=== END POST-INSTALL DEBUG ==="
 
         # Verify vite binary exists
         echo "Checking for vite"
@@ -680,6 +711,18 @@ stages:
         
         echo "Admin will connect to: $(adminUrl)"
 
+        # Debug environment before npm install
+        echo "=== PRE-INSTALL DEBUG ==="
+        echo "Current directory: $(pwd)"
+        echo "User: $(whoami)"
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        echo "NPM config:"
+        npm config list
+        echo "Directory contents:"
+        ls -la
+        echo "=== END PRE-INSTALL DEBUG ==="
+
         export NPM_CONFIG_PRODUCTION=false
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
@@ -688,22 +731,41 @@ stages:
         
         if [ -f package-lock.json ]; then
           echo "✅ Using package-lock.json -> npm ci"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm || {
-            echo "❌ npm ci failed, checking npm logs..."
-            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+          echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+            echo "❌ npm ci failed with exit code: $?"
+            echo "=== NPM CI OUTPUT ==="
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
             exit 1
           }
         else
           echo "⚠️  No package-lock.json; falling back to npm install"
-          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm || {
-            echo "❌ npm install failed, checking npm logs..."
-            cat ~/.npm/_logs/*.log || echo "No npm logs found"
+          echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+            echo "❌ npm install failed with exit code: $?"
+            echo "=== NPM INSTALL OUTPUT ==="
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
             exit 1
           }
         fi
         
-        echo "✅ Dependencies installed, checking node_modules..."
+        echo "=== POST-INSTALL DEBUG ==="
+        echo "✅ npm install completed, checking results..."
+        echo "Directory contents after install:"
+        ls -la
+        echo "node_modules contents:"
+        ls -la node_modules/ | head -20 || echo "No node_modules directory"
+        echo "node_modules/.bin contents:"
         ls -la node_modules/.bin | head -10 || echo "No .bin directory"
+        echo "=== END POST-INSTALL DEBUG ==="
 
         # Make sure vite exists or install
         if ! npx vite --version >/dev/null 2>&1; then

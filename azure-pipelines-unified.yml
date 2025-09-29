@@ -496,16 +496,16 @@ stages:
         echo "Environment: $(environmentName)"
         cd frontend
         
-        echo "Step 1: Create production environment..."
+        echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
         cat > .env << EOF
-        VITE_API_BASE_URL=$(backendUrl)
+        VITE_API_BASE_URL=$(frontendUrl)
         VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech - On-Demand Cleaning
-        NODE_ENV=production
+        NODE_ENV=$(environmentName)
         EOF
         
-        echo "Frontend will connect to: $(backendUrl)"
+        echo "Frontend will connect to: $(frontendUrl)"
         
         echo "Step 2: Install all dependencies (including dev dependencies for build)..."
         npm install --legacy-peer-deps
@@ -584,17 +584,17 @@ stages:
         echo "Environment: $(environmentName)"
         cd admin-dashboard
         
-        echo "Step 1: Create production environment..."
+        echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
         cat > .env << EOF
-        VITE_API_BASE_URL=$(backendUrl)
+        VITE_API_BASE_URL=$(adminUrl)
         VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech Admin Dashboard
         VITE_REQUIRE_AUTH=true
-        NODE_ENV=production
+        NODE_ENV=$(environmentName)
         EOF
         
-        echo "Admin will connect to: $(backendUrl)"
+        echo "Admin will connect to: $(adminUrl)"
         
         echo "Step 2: Install all dependencies (including dev dependencies for build)..."
         npm install --legacy-peer-deps

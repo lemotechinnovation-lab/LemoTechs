@@ -62,17 +62,21 @@ stages:
         rm -rf node_modules .git/index.lock 2>/dev/null || echo "No cleanup needed"
       displayName: 'Pre-checkout Cleanup'
       
+    - script: |
+        echo "Fixing workspace permissions before checkout..."
+        sudo chown -R $(whoami):$(whoami) /home/azureagent/myagent/_work || echo "workspace ownership fix done"
+        sudo chmod -R u+rwX /home/azureagent/myagent/_work || echo "workspace permissions fix done"
+      displayName: "Fix permissions before checkout"
+    
     - checkout: self
       fetchDepth: 2
-      clean: false
+      clean: true
       displayName: 'Checkout with History'
     
     - script: |
-        echo "Manually cleaning repo to avoid permission issues..."
-        sudo rm -rf node_modules frontend/node_modules admin-dashboard/node_modules backend/node_modules || echo "node_modules cleanup done"
-        sudo rm -rf frontend/dist admin-dashboard/dist backend/dist || echo "dist cleanup done"
-        sudo chown -R $(whoami) . || echo "ownership fix done"
-      displayName: 'Manual Clean'
+        echo "Ensuring proper ownership after checkout..."
+        sudo chown -R $(whoami):$(whoami) . || echo "repo ownership fix done"
+      displayName: 'Fix Repository Ownership'
     
     - script: |
         echo "=== LemoTech Intelligent Deployment System ==="
@@ -240,16 +244,20 @@ stages:
         rm -rf node_modules 2>/dev/null || echo "No cleanup needed"
       displayName: 'Pre-deployment Cleanup'
       
+    - script: |
+        echo "Fixing workspace permissions before checkout..."
+        sudo chown -R $(whoami):$(whoami) /home/azureagent/myagent/_work || echo "workspace ownership fix done"
+        sudo chmod -R u+rwX /home/azureagent/myagent/_work || echo "workspace permissions fix done"
+      displayName: "Fix permissions before checkout"
+      
     - checkout: self
-      clean: false
+      clean: true
       displayName: 'Checkout Source Code'
     
     - script: |
-        echo "Fixing permissions before build..."
-        sudo chown -R $(whoami) . || echo "ownership fix done"
-        sudo rm -rf node_modules backend/node_modules || echo "node_modules cleanup done"
-        sudo rm -rf backend/dist || echo "dist cleanup done"
-      displayName: 'Fix Permissions & Clean'
+        echo "Ensuring proper ownership after checkout..."
+        sudo chown -R $(whoami):$(whoami) . || echo "ownership fix done"
+      displayName: 'Fix Repository Ownership'
     
     - task: NodeTool@0
       inputs:
@@ -266,7 +274,7 @@ stages:
         echo "NPM version: $(npm --version)"
         
         echo "Installing dependencies..."
-        npm install --legacy-peer-deps
+        npm install --legacy-peer-deps --unsafe-perm
         
         echo "Running TypeScript build..."
         npx tsc -p tsconfig.prod.json
@@ -289,7 +297,7 @@ stages:
         cd backend
         
         echo "Step 1: Install dependencies and build backend..."
-        npm install --legacy-peer-deps
+        npm install --legacy-peer-deps --unsafe-perm
         npm run build
         
         # Verify build succeeded
@@ -361,7 +369,7 @@ stages:
         cp -r ../backend/scripts ./
         
         echo "Step 5: Install production dependencies..."
-        npm install --production --legacy-peer-deps
+        npm install --production --legacy-peer-deps --unsafe-perm
         
         echo "Step 6: Verify CLEAN backend dist deployment..."
         echo "=== BACKEND DIST DEPLOYMENT VERIFICATION ==="
@@ -498,15 +506,20 @@ stages:
     variables:
       deploymentUrl: '$(frontendUrl)'
     steps:
+    - script: |
+        echo "Fixing workspace permissions before checkout..."
+        sudo chown -R $(whoami):$(whoami) /home/azureagent/myagent/_work || echo "workspace ownership fix done"
+        sudo chmod -R u+rwX /home/azureagent/myagent/_work || echo "workspace permissions fix done"
+      displayName: "Fix permissions before checkout"
+    
     - checkout: self
-      clean: false
+      clean: true
       displayName: 'Checkout Source Code'
     
     - script: |
-        echo "Fixing permissions before frontend build..."
-        sudo chown -R $(whoami) . || echo "ownership fix done"
-        sudo rm -rf frontend/node_modules frontend/dist || echo "frontend cleanup done"
-      displayName: 'Fix Permissions & Clean Frontend'
+        echo "Ensuring proper ownership after checkout..."
+        sudo chown -R $(whoami):$(whoami) . || echo "ownership fix done"
+      displayName: 'Fix Repository Ownership'
     
     - task: NodeTool@0
       inputs:
@@ -545,10 +558,10 @@ stages:
         # Prefer reproducible install under CI - require package-lock.json in repo
         if [ -f package-lock.json ]; then
           echo "Using package-lock.json -> npm ci"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm
         else
           echo "No package-lock.json; falling back to npm install"
-          npm install --legacy-peer-deps --no-audit --progress=false
+          npm install --legacy-peer-deps --unsafe-perm --no-audit --progress=false --unsafe-perm
         fi
 
         # Verify vite binary exists
@@ -557,7 +570,7 @@ stages:
           echo "vite not found; ensure devDependencies include vite"
           npm ls vite || echo "vite not installed"
           echo "Installing vite as fallback..."
-          npm install --save-dev vite --legacy-peer-deps
+          npm install --save-dev vite --legacy-peer-deps --unsafe-perm
         fi
         echo "Vite version: $(npx vite --version || echo 'npx vite failed')"
 
@@ -607,15 +620,20 @@ stages:
     variables:
       deploymentUrl: '$(adminUrl)'
     steps:
+    - script: |
+        echo "Fixing workspace permissions before checkout..."
+        sudo chown -R $(whoami):$(whoami) /home/azureagent/myagent/_work || echo "workspace ownership fix done"
+        sudo chmod -R u+rwX /home/azureagent/myagent/_work || echo "workspace permissions fix done"
+      displayName: "Fix permissions before checkout"
+    
     - checkout: self
-      clean: false
+      clean: true
       displayName: 'Checkout Source Code'
     
     - script: |
-        echo "Fixing permissions before admin build..."
-        sudo chown -R $(whoami) . || echo "ownership fix done"
-        sudo rm -rf admin-dashboard/node_modules admin-dashboard/dist || echo "admin cleanup done"
-      displayName: 'Fix Permissions & Clean Admin'
+        echo "Ensuring proper ownership after checkout..."
+        sudo chown -R $(whoami):$(whoami) . || echo "ownership fix done"
+      displayName: 'Fix Repository Ownership'
     
     - task: NodeTool@0
       inputs:
@@ -652,16 +670,16 @@ stages:
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
         if [ -f package-lock.json ]; then
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm
         else
-          npm install --legacy-peer-deps --no-audit --progress=false
+          npm install --legacy-peer-deps --unsafe-perm --no-audit --progress=false --unsafe-perm
         fi
 
         # Make sure vite exists or install
         if ! npx vite --version >/dev/null 2>&1; then
           echo "vite not installed — checking package.json"
           npm ls vite || echo "vite missing; installing as devDep..."
-          npm install --save-dev vite --legacy-peer-deps
+          npm install --save-dev vite --legacy-peer-deps --unsafe-perm
         fi
         npx vite --version || true
 

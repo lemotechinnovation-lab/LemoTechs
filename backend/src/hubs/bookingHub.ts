@@ -43,7 +43,7 @@ export class BookingHubServer {
     });
 
     this.setupEventHandlers();
-    Logger.info('📡 BookingHubServer: Initialized with Socket.IO');
+    Logger.info('📡 BookingHubServer: Initialized with Socket.IO...');
   }
 
   private setupEventHandlers(): void {

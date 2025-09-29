@@ -174,7 +174,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentPage }) => {
 
         {/* Analytics Section */}
         <SectionHeader 
-          title="Analytics & Insights" 
+          title="Analytics & Insight(s)" 
           icon={<Analytics />}
           dividerColor="rgba(51, 255, 224, 0.4)"
         />

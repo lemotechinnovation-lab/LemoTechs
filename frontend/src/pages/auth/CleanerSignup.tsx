@@ -53,7 +53,7 @@ const CleanerSignup = () => {
       icon: <Support sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,
       title: 'Full Support',
       description: 'Get training, tools, and ongoing support to grow your business.',
-      details: '24/7 support team, training materials, and business development resources.'
+      details: '24/7 Support team, training materials, and business development resources.'
     },
     {
       icon: <TrendingUp sx={{ fontSize: '3rem', color: theme.palette.primary.main }} />,

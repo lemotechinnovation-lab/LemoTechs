@@ -19,6 +19,8 @@ variables:
   - group: LemoTech-Production-Variables
   - name: nodeVersion
     value: '20.x'
+  - name: NPM_CONFIG_PRODUCTION
+    value: false
   - name: environmentName
     ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
       value: 'production'
@@ -490,11 +492,19 @@ stages:
         versionSpec: $(nodeVersion)
       displayName: 'Install Node.js $(nodeVersion)'
     
+    - task: Cache@2
+      inputs:
+        key: 'npm | "$(Agent.OS)" | frontend/package-lock.json'
+        path: frontend/node_modules
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+      displayName: 'Cache frontend node_modules'
+    
     - script: |
-        echo "=== Clean Frontend React Deployment ==="
-        echo "Deployment Target: $(deploymentUrl)"
-        echo "Environment: $(environmentName)"
+        echo "=== Frontend: Clean & Build ==="
         cd frontend
+        pwd
+        echo "Node $(node --version) NPM $(npm --version)"
         
         echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
@@ -506,43 +516,47 @@ stages:
         EOF
         
         echo "Frontend will connect to: $(frontendUrl)"
-        
-        echo "Step 2: Clean and install all dependencies (including dev dependencies for build)..."
-        rm -rf node_modules package-lock.json
-        npm cache clean --force
-        npm install
-        
-        echo "Step 3: Build React application (skip TypeScript for deployment)..."
-        echo "Running: vite build from frontend directory"
-        
-        # Ensure we're in the frontend directory and vite is available
-        pwd
-        ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
-        
-        # Run vite build with explicit path
-        ./node_modules/.bin/vite build 2>&1 || {
-          echo "❌ Vite build command failed! Exit code: $?"
-          echo "Checking vite installation:"
-          ls -la node_modules/.bin/ | grep vite || echo "Vite binary not found"
-          echo "Checking vite package:"
-          ls -la node_modules/vite/ || echo "Vite package not found"
-          exit 1
-        }
-        
-        echo "Step 4: Verify build output..."
-        echo "Checking for dist directory..."
-        if [ -d "dist" ]; then
-          echo "✅ Frontend build successful!"
-          echo "Build contents:"
-          find dist/ -type f | head -10
-          echo "Total files: $(find dist/ -type f | wc -l)"
+
+        # Ensure devDependencies ARE installed for build
+        export NPM_CONFIG_PRODUCTION=false
+        echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
+
+        # Prefer reproducible install under CI - require package-lock.json in repo
+        if [ -f package-lock.json ]; then
+          echo "Using package-lock.json -> npm ci"
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
         else
-          echo "❌ Frontend build failed - no dist directory created!"
-          echo "Current directory contents:"
+          echo "No package-lock.json; falling back to npm install"
+          npm install --legacy-peer-deps --no-audit --progress=false
+        fi
+
+        # Verify vite binary exists
+        echo "Checking for vite"
+        if ! npx vite --version >/dev/null 2>&1; then
+          echo "vite not found; ensure devDependencies include vite"
+          npm ls vite || echo "vite not installed"
+          echo "Installing vite as fallback..."
+          npm install --save-dev vite --legacy-peer-deps
+        fi
+        echo "Vite version: $(npx vite --version || echo 'npx vite failed')"
+
+        # Build (prefer package.json script if present)
+        if grep -q "\"build\"\s*:\s*\".*vite build" package.json; then
+          echo "Running npm run build"
+          npm run build --if-present
+        else
+          echo "Running npx vite build"
+          npx vite build
+        fi
+
+        # Verify build output
+        if [ -d "dist" ]; then
+          echo "✅ Frontend build completed; dist created ($(find dist -type f | wc -l) files)"
+          ls -la dist | head -n 20
+        else
+          echo "❌ Frontend build failed: dist not found"
+          echo "Workspace contents:"
           ls -la
-          echo ""
-          echo "Checking for build errors in package.json scripts:"
-          grep -A 5 '"scripts"' package.json
           exit 1
         fi
         
@@ -554,7 +568,7 @@ stages:
         cd ..
         
         echo "✅ Frontend deployment package ready!"
-      displayName: 'Build Frontend'
+      displayName: 'Build Frontend (robust)'
     
     - task: AzureStaticWebApp@0
       inputs:
@@ -580,11 +594,19 @@ stages:
         versionSpec: $(nodeVersion)
       displayName: 'Install Node.js $(nodeVersion)'
     
+    - task: Cache@2
+      inputs:
+        key: 'npm | "$(Agent.OS)" | admin-dashboard/package-lock.json'
+        path: admin-dashboard/node_modules
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+      displayName: 'Cache admin-dashboard node_modules'
+    
     - script: |
-        echo "=== Clean Admin Dashboard React Deployment ==="
-        echo "Deployment Target: $(deploymentUrl)"
-        echo "Environment: $(environmentName)"
+        echo "=== Admin Dashboard: Clean & Build ==="
         cd admin-dashboard
+        pwd
+        echo "Node $(node --version) NPM $(npm --version)"
         
         echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
@@ -597,28 +619,38 @@ stages:
         EOF
         
         echo "Admin will connect to: $(adminUrl)"
-        
-        echo "Step 2: Clean and install all dependencies (including dev dependencies for build)..."
-        rm -rf node_modules package-lock.json
-        npm cache clean --force
-        npm install
-        
-        echo "Step 3: Build React admin dashboard (skip TypeScript for deployment)..."
-        echo "Running: vite build from admin-dashboard directory"
-        
-        # Ensure we're in the admin directory and vite is available
-        pwd
-        ls -la node_modules/.bin/vite || echo "Vite not found in .bin"
-        
-        # Run vite build with explicit path
-        ./node_modules/.bin/vite build 2>&1 || {
-          echo "❌ Admin vite build command failed! Exit code: $?"
-          echo "Checking vite installation:"
-          ls -la node_modules/.bin/ | grep vite || echo "Vite binary not found"
-          echo "Checking vite package:"
-          ls -la node_modules/vite/ || echo "Vite package not found"
+
+        export NPM_CONFIG_PRODUCTION=false
+        echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
+
+        if [ -f package-lock.json ]; then
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false
+        else
+          npm install --legacy-peer-deps --no-audit --progress=false
+        fi
+
+        # Make sure vite exists or install
+        if ! npx vite --version >/dev/null 2>&1; then
+          echo "vite not installed — checking package.json"
+          npm ls vite || echo "vite missing; installing as devDep..."
+          npm install --save-dev vite --legacy-peer-deps
+        fi
+        npx vite --version || true
+
+        # Build
+        if grep -q "\"build\"\s*:\s*\".*vite build" package.json; then
+          npm run build --if-present
+        else
+          npx vite build
+        fi
+
+        if [ -d "dist" ]; then
+          echo "✅ Admin build successful"
+        else
+          echo "❌ Admin build failed: dist missing"
+          ls -la
           exit 1
-        }
+        fi
         
         echo "Step 4: Verify build output..."
         echo "Checking for dist directory..."
@@ -666,7 +698,7 @@ stages:
         cd ..
         
         echo "✅ Admin dashboard deployment package ready!"
-      displayName: 'Build Admin Dashboard'
+      displayName: 'Build Admin Dashboard (robust)'
     
     - task: AzureStaticWebApp@0
       inputs:

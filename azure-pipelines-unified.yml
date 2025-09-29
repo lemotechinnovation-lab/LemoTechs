@@ -546,7 +546,6 @@ stages:
         VITE_API_BASE_URL=$(frontendUrl)
         VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech - On-Demand Cleaning
-        NODE_ENV=$(environmentName)
         EOF
         
         echo "Frontend will connect to: $(frontendUrl)"
@@ -733,7 +732,6 @@ stages:
         VITE_ENVIRONMENT=$(environmentName)
         VITE_APP_TITLE=LemoTech Admin Dashboard
         VITE_REQUIRE_AUTH=true
-        NODE_ENV=$(environmentName)
         EOF
         
         echo "Admin will connect to: $(adminUrl)"

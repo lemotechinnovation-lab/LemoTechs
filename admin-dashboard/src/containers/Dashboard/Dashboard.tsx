@@ -1172,7 +1172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentPage }) => {
                     lineHeight: 1.4,
                   }}
                 >
-                  93.9%
+                  99.9%
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>

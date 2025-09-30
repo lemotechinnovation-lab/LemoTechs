@@ -588,14 +588,20 @@ stages:
           echo "✅ Using package-lock.json -> npm ci"
           echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
           npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm ci failed with exit code: $?"
+            echo "❌ npm ci failed, likely package-lock.json out of sync. Falling back to npm install..."
             echo "=== NPM CI OUTPUT ==="
             cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
-            exit 1
+            echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+            npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+              echo "❌ npm install also failed with exit code: $?"
+              echo "=== NPM INSTALL OUTPUT ==="
+              cat npm-install.log || echo "No npm-install.log"
+              echo "=== NPM LOGS ==="
+              find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+              echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+              ls -la
+              exit 1
+            }
           }
         else
           echo "⚠️  No package-lock.json; falling back to npm install"
@@ -695,8 +701,8 @@ stages:
         rm -rf ../deploy-frontend || true
         mkdir -p ../deploy-frontend
         
-        # Copy all dist files to deployment directory
-        cp -r dist/* ../deploy-frontend/
+        # Copy all dist files to deployment directory (including hidden files)
+        cp -r dist/. ../deploy-frontend/
         
         # Create minimal Node.js server for SPA serving
         cat > ../deploy-frontend/server.js << 'EOF'
@@ -872,8 +878,7 @@ stages:
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
               NODE_ENV="$(environmentName)" \
               FRONTEND_URL="$(frontendUrl)" \
-              BACKEND_URL="$(backendUrl)" \
-              CORS_ORIGIN="$(backendUrl)"
+              BACKEND_URL="$(backendUrl)"
           
           echo "✅ Frontend app settings configured"
           
@@ -993,14 +998,20 @@ stages:
           echo "✅ Using package-lock.json -> npm ci"
           echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
           npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm ci failed with exit code: $?"
+            echo "❌ npm ci failed, likely package-lock.json out of sync. Falling back to npm install..."
             echo "=== NPM CI OUTPUT ==="
             cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
-            exit 1
+            echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+            npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+              echo "❌ npm install also failed with exit code: $?"
+              echo "=== NPM INSTALL OUTPUT ==="
+              cat npm-install.log || echo "No npm-install.log"
+              echo "=== NPM LOGS ==="
+              find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+              echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+              ls -la
+              exit 1
+            }
           }
         else
           echo "⚠️  No package-lock.json; falling back to npm install"
@@ -1107,31 +1118,9 @@ stages:
         rm -rf ../deploy-admin || true
         mkdir -p ../deploy-admin
         
-        # Copy all dist files to deployment directory
-        cp -r dist/* ../deploy-admin/
+        # Copy all dist files to deployment directory (including hidden files)
+        cp -r dist/. ../deploy-admin/
         
-        # Add security configuration (as JSON file for reference)
-        echo '{
-          "routes": [
-            {
-              "route": "/*",
-              "serve": "/index.html",
-              "statusCode": 200,
-              "allowedRoles": ["admin", "manager"]
-            }
-          ],
-          "responseOverrides": {
-            "401": {
-              "redirect": "/login",
-              "statusCode": 302
-            }
-          },
-          "globalHeaders": {
-            "X-Frame-Options": "DENY",
-            "X-Content-Type-Options": "nosniff",
-            "Strict-Transport-Security": "max-age=31536000"
-          }
-        }' > ../deploy-admin/security-config.json
         
         # Create minimal Node.js server for admin SPA serving
         cat > ../deploy-admin/server.js << 'EOF'
@@ -1304,7 +1293,7 @@ stages:
           RG='lemotech-platform'
           APP='lemotech-admin'
           
-          # Set performance and timeout settings with admin-specific security
+          # Set performance and timeout settings
           az webapp config appsettings set \
             --resource-group "$RG" \
             --name "$APP" \
@@ -1316,12 +1305,9 @@ stages:
               WEBSITE_NODE_DEFAULT_VERSION="~20" \
               NODE_ENV="$(environmentName)" \
               ADMIN_URL="$(adminUrl)" \
-              BACKEND_URL="$(backendUrl)" \
-              CORS_ORIGIN="$(backendUrl)" \
-              REQUIRE_AUTH="true" \
-              SECURITY_HEADERS="enabled"
+              BACKEND_URL="$(backendUrl)"
           
-          echo "✅ Admin app settings configured with security"
+          echo "✅ Admin app settings configured"
           
           # Start the app
           echo "Starting $APP..."

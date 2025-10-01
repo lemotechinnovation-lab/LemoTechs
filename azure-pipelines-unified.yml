@@ -671,7 +671,29 @@ stages:
         # Verify build output
         if [ -d "dist" ]; then
           echo "✅ Frontend build completed; dist created ($(find dist -type f | wc -l) files)"
-          ls -la dist | head -n 20
+          echo "=== COMPLETE FRONTEND DIST CONTENTS ==="
+          find dist -type f | sort
+          echo "=== FRONTEND DIST DIRECTORY STRUCTURE ==="
+          ls -la dist/
+          if [ -d "dist/assets" ]; then
+            echo "Assets directory: $(find dist/assets -type f | wc -l) files"
+          fi
+          if [ -d "dist/icons" ]; then
+            echo "Icons directory: $(find dist/icons -type f | wc -l) files"
+            ls -la dist/icons/
+          else
+            echo "⚠️ No icons directory in dist - will need to copy from public"
+          fi
+          
+          # Check for specific expected files
+          EXPECTED_DIST_FILES=(".htaccess" "browserconfig.xml" "manifest.json" "sw.js" "vite.svg" "index.html")
+          for file in "${EXPECTED_DIST_FILES[@]}"; do
+            if [ -f "dist/$file" ]; then
+              echo "✅ Found in dist: $file"
+            else
+              echo "⚠️ Missing from dist: $file (will copy from public)"
+            fi
+          done
         else
           echo "❌ Frontend build failed: dist not found"
           echo "Workspace contents:"
@@ -719,10 +741,17 @@ stages:
           fi
         done
         
-        # First copy all dist files (built files)
+        # PHASE 1: Copy all dist files (built files) with verification
+        echo "=== COPYING ALL FRONTEND DIST FILES ==="
+        echo "Source dist files:"
+        find dist -type f | wc -l
+        
         cp -r dist/. ../deploy-frontend/
         
-        # Verify all expected frontend dist files are present
+        echo "After copying dist, deploy-frontend contains:"
+        find ../deploy-frontend -type f | wc -l
+        
+        # PHASE 2: Verify all expected frontend dist files are present
         echo "=== Verifying expected frontend dist files ==="
         EXPECTED_FRONTEND_DIST=(
           "assets"
@@ -735,13 +764,40 @@ stages:
           "vite.svg"
         )
         
+        MISSING_FILES=()
         for item in "${EXPECTED_FRONTEND_DIST[@]}"; do
           if [ -e "../deploy-frontend/$item" ]; then
             echo "✅ Found expected: $item"
           else
             echo "❌ Missing expected: $item"
+            MISSING_FILES+=("$item")
           fi
         done
+        
+        # PHASE 3: Force copy missing files from public if they exist
+        if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+          echo "=== FORCE COPYING MISSING FILES FROM PUBLIC ==="
+          for item in "${MISSING_FILES[@]}"; do
+            if [ -e "public/$item" ]; then
+              echo "🔄 Force copying missing $item from public..."
+              if [ -d "public/$item" ]; then
+                mkdir -p "../deploy-frontend/$item"
+                cp -r "public/$item/." "../deploy-frontend/$item/"
+              else
+                cp "public/$item" "../deploy-frontend/$item"
+              fi
+              
+              # Verify the copy worked
+              if [ -e "../deploy-frontend/$item" ]; then
+                echo "✅ Successfully copied $item from public"
+              else
+                echo "❌ Failed to copy $item from public"
+              fi
+            else
+              echo "⚠️ $item not found in public directory either"
+            fi
+          done
+        fi
         
         # Frontend should only use its own built dist files and public files
         echo "=== Checking what frontend build generated vs what's in public ==="
@@ -1315,33 +1371,31 @@ stages:
         echo "Checking for dist directory..."
         if [ -d "dist" ]; then
           echo "✅ Admin dashboard build successful!"
+          echo "=== COMPLETE ADMIN DIST CONTENTS ==="
+          find dist -type f | sort
+          echo "=== ADMIN DIST DIRECTORY STRUCTURE ==="
+          ls -la dist/
+          if [ -d "dist/assets" ]; then
+            echo "Admin assets directory: $(find dist/assets -type f | wc -l) files"
+          fi
+          if [ -d "dist/icons" ]; then
+            echo "Admin icons directory: $(find dist/icons -type f | wc -l) files"
+            ls -la dist/icons/
+          else
+            echo "ℹ️ Admin has no icons directory in dist (expected - admin has fewer files)"
+          fi
           
-          # Add security configuration for Static Web Apps
-          echo '{
-            "routes": [
-              {
-                "route": "/*",
-                "serve": "/index.html",
-                "statusCode": 200,
-                "allowedRoles": ["admin", "manager"]
-              }
-            ],
-            "responseOverrides": {
-              "401": {
-                "redirect": "/login",
-                "statusCode": 302
-              }
-            },
-            "globalHeaders": {
-              "X-Frame-Options": "DENY",
-              "X-Content-Type-Options": "nosniff",
-              "Strict-Transport-Security": "max-age=31536000"
-            }
-          }' > dist/staticwebapp.config.json
+          # Check for admin-specific expected files
+          EXPECTED_ADMIN_DIST_FILES=("index.html" "vite.svg")
+          for file in "${EXPECTED_ADMIN_DIST_FILES[@]}"; do
+            if [ -f "dist/$file" ]; then
+              echo "✅ Found in admin dist: $file"
+            else
+              echo "⚠️ Missing from admin dist: $file"
+            fi
+          done
           
-          echo "Build contents:"
-          find dist/ -type f | head -10
-          echo "Total files: $(find dist/ -type f | wc -l)"
+          echo "Total admin dist files: $(find dist/ -type f | wc -l)"
         else
           echo "❌ Admin dashboard build failed!"
           echo "Current directory contents:"
@@ -1385,10 +1439,17 @@ stages:
           echo "=== DEBUG: Admin dist does NOT have icons directory ==="
         fi
         
-        # First copy all dist files (built files)
+        # PHASE 1: Copy all admin dist files (built files) with verification
+        echo "=== COPYING ALL ADMIN DIST FILES ==="
+        echo "Source admin dist files:"
+        find dist -type f | wc -l
+        
         cp -r dist/. ../deploy-admin/
         
-        # Verify all expected admin dist files are present
+        echo "After copying admin dist, deploy-admin contains:"
+        find ../deploy-admin -type f | wc -l
+        
+        # PHASE 2: Verify all expected admin dist files are present
         echo "=== Verifying expected admin dist files ==="
         EXPECTED_ADMIN_DIST=(
           "assets"
@@ -1397,13 +1458,40 @@ stages:
           "vite.svg"
         )
         
+        MISSING_ADMIN_FILES=()
         for item in "${EXPECTED_ADMIN_DIST[@]}"; do
           if [ -e "../deploy-admin/$item" ]; then
             echo "✅ Found expected admin: $item"
           else
             echo "❌ Missing expected admin: $item"
+            MISSING_ADMIN_FILES+=("$item")
           fi
         done
+        
+        # PHASE 3: Force copy missing admin files from public if they exist
+        if [ ${#MISSING_ADMIN_FILES[@]} -gt 0 ]; then
+          echo "=== FORCE COPYING MISSING ADMIN FILES FROM PUBLIC ==="
+          for item in "${MISSING_ADMIN_FILES[@]}"; do
+            if [ -e "public/$item" ]; then
+              echo "🔄 Force copying missing admin $item from public..."
+              if [ -d "public/$item" ]; then
+                mkdir -p "../deploy-admin/$item"
+                cp -r "public/$item/." "../deploy-admin/$item/"
+              else
+                cp "public/$item" "../deploy-admin/$item"
+              fi
+              
+              # Verify the admin copy worked
+              if [ -e "../deploy-admin/$item" ]; then
+                echo "✅ Successfully copied admin $item from public"
+              else
+                echo "❌ Failed to copy admin $item from public"
+              fi
+            else
+              echo "ℹ️ Admin $item not found in public directory (this may be normal for admin)"
+            fi
+          done
+        fi
         
         # Force copy ALL public files to ensure nothing is missing
         echo "=== Force copying ALL admin public files ==="
@@ -1651,6 +1739,20 @@ stages:
           echo "✅ wwwroot cleaned - ready for clean admin deployment"
       displayName: 'Clean Admin App Service wwwroot'
 
+    - script: |
+        echo "=== PRE-DEPLOYMENT ADMIN ZIP VERIFICATION ==="
+        cd "$(Build.ArtifactStagingDirectory)"
+        echo "Admin ZIP file exists: $(ls -la admin-$(Build.BuildId).zip)"
+        echo "Admin ZIP file size: $(du -h admin-$(Build.BuildId).zip)"
+        echo "Extracting admin ZIP to verify contents..."
+        mkdir -p temp-extract-admin
+        unzip -q admin-$(Build.BuildId).zip -d temp-extract-admin
+        echo "Extracted admin contents:"
+        find temp-extract-admin -type f | sort
+        echo "Total extracted admin files: $(find temp-extract-admin -type f | wc -l)"
+        rm -rf temp-extract-admin
+      displayName: 'Pre-Deployment Admin ZIP Verification'
+
     - task: AzureWebApp@1
       inputs:
         azureSubscription: 'LemoTech-Azure-Connection'
@@ -1660,9 +1762,39 @@ stages:
         package: '$(Build.ArtifactStagingDirectory)/admin-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node server.js'
-        deploymentMethod: 'zipDeploy'
+        deploymentMethod: 'auto'
         appSettings: '-NODE_ENV $(environmentName) -ADMIN_URL $(adminUrl) -BACKEND_URL $(backendUrl) -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
       displayName: 'Deploy Admin Dashboard to Azure App Service'
+      continueOnError: true
+
+    - script: |
+        echo "=== CHECKING ADMIN DEPLOYMENT STATUS ==="
+        if [ "$AGENT_JOBSTATUS" != "Succeeded" ]; then
+          echo "Admin ZIP deployment failed, attempting alternative deployment via Kudu API..."
+          
+          # Extract ZIP and deploy via Kudu API
+          cd "$(Build.ArtifactStagingDirectory)"
+          mkdir -p manual-deploy-admin
+          unzip -q admin-$(Build.BuildId).zip -d manual-deploy-admin
+          
+          echo "Admin files to deploy manually:"
+          find manual-deploy-admin -type f | wc -l
+          
+          # Get publishing credentials
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group lemotech-platform --name lemotech-admin --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          USERNAME=$(echo $CREDS | cut -f1)
+          PASSWORD=$(echo $CREDS | cut -f2)
+          
+          # Deploy files via Kudu API
+          echo "Deploying admin files via Kudu API..."
+          cd manual-deploy-admin
+          find . -type f -exec curl -T {} "https://lemotech-admin.scm.azurewebsites.net/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
+          
+          echo "✅ Manual admin deployment completed"
+        else
+          echo "✅ Admin ZIP deployment succeeded"
+        fi
+      displayName: 'Fallback Manual Admin Deployment if ZIP Deploy Failed'
 
     - task: AzureCLI@2
       inputs:

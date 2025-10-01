@@ -595,12 +595,12 @@ stages:
             npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
               echo "❌ npm install also failed with exit code: $?"
               echo "=== NPM INSTALL OUTPUT ==="
-              cat npm-install.log || echo "No npm-install.log"
-              echo "=== NPM LOGS ==="
-              find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-              echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-              ls -la
-              exit 1
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
+            exit 1
             }
           }
         else
@@ -708,13 +708,27 @@ stages:
         find dist -name ".*" -type f
         echo "=== DEBUG: All files in dist ==="
         ls -la dist/
+        echo "=== DEBUG: Files in public directory ==="
+        ls -la public/
         
+        # First copy all dist files (built files)
         cp -r dist/. ../deploy-frontend/
         
-        echo "=== DEBUG: Files copied to deploy-frontend ==="
-        find ../deploy-frontend -type f -name "*" | head -20
+        # Then ensure all public files are copied (in case Vite missed some)
+        echo "=== Ensuring all public files are included ==="
+        cp -r public/. ../deploy-frontend/ 2>/dev/null || echo "No additional public files to copy"
+        
+        # Remove any duplicate index.html from public (dist version should take precedence)
+        if [ -f "../deploy-frontend/index.html" ] && [ -f "public/index.html" ]; then
+          echo "Using built index.html from dist, not public version"
+        fi
+        
+        echo "=== DEBUG: Final files in deploy-frontend ==="
+        find ../deploy-frontend -type f -name "*" | head -30
         echo "=== DEBUG: Hidden files in deploy-frontend ==="
         find ../deploy-frontend -name ".*" -type f
+        echo "=== DEBUG: Directory structure ==="
+        ls -la ../deploy-frontend/
         
         # Create minimal Node.js server for SPA serving
         cat > ../deploy-frontend/server.js << 'EOF'
@@ -874,6 +888,31 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
+          echo "=== Post-Deployment Verification ==="
+          RG='lemotech-platform'
+          APP='lemotech-frontend'
+          
+          # Check deployment status
+          echo "App Service deployment status:"
+          az webapp show --resource-group "$RG" --name "$APP" --query "{state:state,defaultHostName:defaultHostName,httpsOnly:httpsOnly}" --output table
+          
+          # Check startup command
+          echo "Startup command:"
+          az webapp config show --resource-group "$RG" --name "$APP" --query "appCommandLine" --output tsv
+          
+          # Check if server.js exists
+          echo "Checking if server.js exists in deployment:"
+          az webapp ssh --resource-group "$RG" --name "$APP" --command "ls -la /home/site/wwwroot/" || echo "Could not check files"
+          
+          echo "✅ Post-deployment verification complete"
+      displayName: 'Verify Frontend Deployment'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'LemoTech-Azure-Connection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
           echo "=== Configuring Frontend App Service Settings ==="
           RG='lemotech-platform'
           APP='lemotech-frontend'
@@ -904,16 +943,48 @@ stages:
         echo "=== Frontend Health Check ==="
         echo "Checking frontend health at: $(deploymentUrl)"
         echo "Environment: $(environmentName)"
+        
+        # Check App Service status first
+        echo "=== Checking App Service Status ==="
+        az webapp show --name lemotech-frontend --resource-group lemotech-platform --query "{state:state,hostNames:hostNames}" --output table
+        
+        # Check if the default Azure URL works first
+        DEFAULT_URL="https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net/"
+        echo "=== Testing default Azure URL: $DEFAULT_URL ==="
+        curl -I "$DEFAULT_URL" || echo "Default URL not responding"
+        
+        # Check app logs for errors
+        echo "=== Recent App Service Logs ==="
+        az webapp log tail --name lemotech-frontend --resource-group lemotech-platform --provider application --timeout 30 || echo "Could not fetch logs"
+        
         sleep 60
         
         for i in {1..10}; do
           echo "Health check attempt $i/10..."
-          if curl -f -s -o /dev/null "$(deploymentUrl)" 2>/dev/null; then
-            echo "✅ Frontend is healthy!"
+          
+          # Try both URLs
+          echo "Testing custom domain: $(deploymentUrl)"
+          if curl -f -s -I "$(deploymentUrl)" 2>/dev/null; then
+            echo "✅ Frontend is healthy on custom domain!"
             echo "Frontend successfully deployed to: $(deploymentUrl)"
             break
-          elif [ $i -eq 10 ]; then
-            echo "⚠️ Frontend health check timeout for $(deploymentUrl)"
+          fi
+          
+          echo "Testing default URL: $DEFAULT_URL"
+          if curl -f -s -I "$DEFAULT_URL" 2>/dev/null; then
+            echo "✅ Frontend is healthy on default URL!"
+            echo "⚠️ Custom domain $(deploymentUrl) may have DNS/SSL issues"
+            break
+          fi
+          
+          if [ $i -eq 10 ]; then
+            echo "❌ Frontend health check failed for both URLs"
+            echo "Custom domain: $(deploymentUrl)"
+            echo "Default URL: $DEFAULT_URL"
+            
+            # Final diagnostic
+            echo "=== Final Diagnostic ==="
+            az webapp show --name lemotech-frontend --resource-group lemotech-platform --query "{state:state,defaultHostName:defaultHostName,hostNames:hostNames,httpsOnly:httpsOnly}" --output table
           else
             echo "Frontend not ready, waiting 30 seconds..."
             sleep 30
@@ -1017,12 +1088,12 @@ stages:
             npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
               echo "❌ npm install also failed with exit code: $?"
               echo "=== NPM INSTALL OUTPUT ==="
-              cat npm-install.log || echo "No npm-install.log"
-              echo "=== NPM LOGS ==="
-              find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-              echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-              ls -la
-              exit 1
+            cat npm-install.log || echo "No npm-install.log"
+            echo "=== NPM LOGS ==="
+            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
+            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
+            ls -la
+            exit 1
             }
           }
         else
@@ -1137,13 +1208,27 @@ stages:
         find dist -name ".*" -type f
         echo "=== DEBUG: All files in admin dist ==="
         ls -la dist/
+        echo "=== DEBUG: Files in admin public directory ==="
+        ls -la public/
         
+        # First copy all dist files (built files)
         cp -r dist/. ../deploy-admin/
         
-        echo "=== DEBUG: Files copied to deploy-admin ==="
-        find ../deploy-admin -type f -name "*" | head -20
+        # Then ensure all public files are copied (in case Vite missed some)
+        echo "=== Ensuring all admin public files are included ==="
+        cp -r public/. ../deploy-admin/ 2>/dev/null || echo "No additional public files to copy"
+        
+        # Remove any duplicate index.html from public (dist version should take precedence)
+        if [ -f "../deploy-admin/index.html" ] && [ -f "public/index.html" ]; then
+          echo "Using built index.html from dist, not public version"
+        fi
+        
+        echo "=== DEBUG: Final files in deploy-admin ==="
+        find ../deploy-admin -type f -name "*" | head -30
         echo "=== DEBUG: Hidden files in deploy-admin ==="
         find ../deploy-admin -name ".*" -type f
+        echo "=== DEBUG: Directory structure ==="
+        ls -la ../deploy-admin/
         
         
         # Create minimal Node.js server for admin SPA serving
@@ -1343,16 +1428,48 @@ stages:
         echo "=== Admin Dashboard Health Check ==="
         echo "Checking admin dashboard health at: $(deploymentUrl)"
         echo "Environment: $(environmentName)"
+        
+        # Check App Service status first
+        echo "=== Checking Admin App Service Status ==="
+        az webapp show --name lemotech-admin --resource-group lemotech-platform --query "{state:state,hostNames:hostNames}" --output table
+        
+        # Check if the default Azure URL works first
+        DEFAULT_URL="lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net"
+        echo "=== Testing default Azure URL: $DEFAULT_URL ==="
+        curl -I "$DEFAULT_URL" || echo "Default URL not responding"
+        
+        # Check app logs for errors
+        echo "=== Recent Admin App Service Logs ==="
+        az webapp log tail --name lemotech-admin --resource-group lemotech-platform --provider application --timeout 30 || echo "Could not fetch logs"
+        
         sleep 60
         
         for i in {1..10}; do
           echo "Health check attempt $i/10..."
-          if curl -f -s -o /dev/null "$(deploymentUrl)" 2>/dev/null; then
-            echo "✅ Admin Dashboard is healthy!"
+          
+          # Try both URLs
+          echo "Testing custom domain: $(deploymentUrl)"
+          if curl -f -s -I "$(deploymentUrl)" 2>/dev/null; then
+            echo "✅ Admin Dashboard is healthy on custom domain!"
             echo "Admin Dashboard successfully deployed to: $(deploymentUrl)"
             break
-          elif [ $i -eq 10 ]; then
-            echo "⚠️ Admin Dashboard health check timeout for $(deploymentUrl)"
+          fi
+          
+          echo "Testing default URL: $DEFAULT_URL"
+          if curl -f -s -I "$DEFAULT_URL" 2>/dev/null; then
+            echo "✅ Admin Dashboard is healthy on default URL!"
+            echo "⚠️ Custom domain $(deploymentUrl) may have DNS/SSL issues"
+            break
+          fi
+          
+          if [ $i -eq 10 ]; then
+            echo "❌ Admin Dashboard health check failed for both URLs"
+            echo "Custom domain: $(deploymentUrl)"
+            echo "Default URL: $DEFAULT_URL"
+            
+            # Final diagnostic
+            echo "=== Final Diagnostic ==="
+            az webapp show --name lemotech-admin --resource-group lemotech-platform --query "{state:state,defaultHostName:defaultHostName,hostNames:hostNames,httpsOnly:httpsOnly}" --output table
           else
             echo "Admin Dashboard not ready, waiting 30 seconds..."
             sleep 30

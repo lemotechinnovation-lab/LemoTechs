@@ -1,16 +1,33 @@
 # LemoTech Unified Deployment Pipeline
 # Intelligent deployment that detects changes and deploys only what's needed
 
+# CI Trigger - Runs on code pushes
 trigger:
   branches:
     include:
     - master
     - main
+    - develop
+    - release/*
   paths:
     exclude:
     - docs/*
     - README.md
     - "*.md"
+
+# Release Trigger - Runs on tag creation for production releases
+pr: none
+
+# Resource triggers for release tags
+resources:
+  repositories:
+  - repository: self
+    trigger:
+      tags:
+        include:
+        - v*.*.*
+        - release-*
+        - hotfix-*
 
 pool:
   name: 'Default'
@@ -21,24 +38,45 @@ variables:
     value: '20.x'
   - name: NPM_CONFIG_PRODUCTION
     value: false
+  
+  # Release Detection Variables
+  - name: isRelease
+    ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-')) }}:
+      value: 'true'
+    ${{ else }}:
+      value: 'false'
+  
+  - name: isProduction
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'true'
+    ${{ else }}:
+      value: 'false'
+  
   - name: environmentName
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'production'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}:
+      value: 'staging'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-') }}:
+      value: 'hotfix'
     ${{ else }}:
       value: 'development'
-  # Production URLs use custom domain, development uses Azure defaults
+  
+  # Production URLs use custom domain, development/staging uses Azure defaults
   - name: frontendUrl
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://www.lemotechinnovations.co.za'
     ${{ else }}:
       value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
+  
   - name: backendUrl
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://api.lemotechinnovations.co.za'
     ${{ else }}:
       value: 'https://lemotech-api-backend.azurewebsites.net'
+  
   - name: adminUrl
-    ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://admin.lemotechinnovations.co.za'
     ${{ else }}:
       value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
@@ -50,8 +88,83 @@ variables:
     value: 'lemotech-platform'
 
 stages:
+- stage: ReleaseInfo
+  displayName: 'Release Information & Validation'
+  jobs:
+  - job: ValidateRelease
+    displayName: 'Validate Release Information'
+    steps:
+    - checkout: none
+    
+    - script: |
+        echo "=== 🚀 LemoTech Release Pipeline ==="
+        echo "Build Reason: $(Build.Reason)"
+        echo "Source Branch: $(Build.SourceBranch)"
+        echo "Source Version: $(Build.SourceVersion)"
+        echo ""
+        
+        # Determine release type
+        if [[ "$(Build.SourceBranch)" == refs/tags/v* ]]; then
+          RELEASE_TYPE="Production Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/tags/release-* ]]; then
+          RELEASE_TYPE="Release Candidate"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/tags/hotfix-* ]]; then
+          RELEASE_TYPE="Hotfix Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/heads/release/* ]]; then
+          RELEASE_TYPE="Staging Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/heads/release/||')
+        elif [[ "$(Build.SourceBranch)" == "refs/heads/master" ]]; then
+          RELEASE_TYPE="Production CI"
+          VERSION="latest"
+        else
+          RELEASE_TYPE="Development Build"
+          VERSION="dev-$(Build.BuildNumber)"
+        fi
+        
+        echo "=== Release Information ==="
+        echo "Release Type: $RELEASE_TYPE"
+        echo "Version: $VERSION"
+        echo "Environment: $(environmentName)"
+        echo "Is Release: $(isRelease)"
+        echo "Is Production: $(isProduction)"
+        echo ""
+        echo "=== Deployment Targets ==="
+        echo "Frontend: $(frontendUrl)"
+        echo "Backend: $(backendUrl)"
+        echo "Admin: $(adminUrl)"
+        echo ""
+        
+        # Set release variables for downstream stages
+        echo "##vso[task.setvariable variable=releaseType;isOutput=true]$RELEASE_TYPE"
+        echo "##vso[task.setvariable variable=releaseVersion;isOutput=true]$VERSION"
+        
+        # Validate production releases
+        if [[ "$(isProduction)" == "true" ]]; then
+          echo "=== 🔒 Production Release Validation ==="
+          
+          # Check if this is a proper release tag
+          if [[ "$(Build.SourceBranch)" == refs/tags/v* ]]; then
+            echo "✅ Valid production release tag: $VERSION"
+          elif [[ "$(Build.SourceBranch)" == "refs/heads/master" ]]; then
+            echo "✅ Master branch deployment to production"
+          else
+            echo "⚠️  Production deployment from non-standard branch"
+          fi
+          
+          # Additional production validations can be added here
+          echo "✅ Production release validation completed"
+        fi
+        
+        echo "✅ Release information validated successfully!"
+      displayName: 'Display Release Information'
+      name: 'releaseInfo'
+
 - stage: DetectChanges
   displayName: 'Detect Changes and Plan Deployment'
+  dependsOn: ReleaseInfo
   jobs:
   - job: AnalyzeChanges
     displayName: 'Analyze Changed Files'
@@ -84,20 +197,9 @@ stages:
     
     - script: |
         echo "=== LemoTech Intelligent Deployment System ==="
+        echo "Release Type: $(isRelease)"
+        echo "Environment: $(environmentName)"
         echo "Analyzing changes to determine deployment strategy..."
-        echo ""
-        
-        # Get changed files between this commit and the previous one
-        if [ "$(Build.Reason)" = "PullRequest" ]; then
-          echo "Pull Request detected, comparing with target branch..."
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-        else
-          echo "Direct push detected, comparing with previous commit..."
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-        fi
-        
-        echo "Changed files:"
-        echo "$CHANGED_FILES"
         echo ""
         
         # Initialize deployment flags
@@ -105,30 +207,54 @@ stages:
         DEPLOY_FRONTEND=false
         DEPLOY_ADMIN=false
         
-        # Check for backend changes
-        if echo "$CHANGED_FILES" | grep -E "^(backend/|src/|\.deployment|azure-pipelines-backend\.yml|package\.json)" > /dev/null; then
-          echo "🔄 Backend changes detected!"
-          DEPLOY_BACKEND=true
-        fi
-        
-        # Check for frontend changes
-        if echo "$CHANGED_FILES" | grep -E "^(frontend/|src/|azure-pipelines-frontend\.yml)" > /dev/null; then
-          echo "🔄 Frontend changes detected!"
-          DEPLOY_FRONTEND=true
-        fi
-        
-        # Check for admin dashboard changes
-        if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|src/|azure-pipelines-admin\.yml)" > /dev/null; then
-          echo "🔄 Admin dashboard changes detected!"
-          DEPLOY_ADMIN=true
-        fi
-        
-        # Check for template changes (affects all)
-        if echo "$CHANGED_FILES" | grep -E "^templates/" > /dev/null; then
-          echo "🔄 Template changes detected - will deploy all applications!"
+        # For releases (tags), deploy everything
+        if [[ "$(isRelease)" == "true" ]]; then
+          echo "🚀 Release detected - deploying all components"
           DEPLOY_BACKEND=true
           DEPLOY_FRONTEND=true
           DEPLOY_ADMIN=true
+        else
+          # For regular commits, analyze changed files
+          echo "📝 Regular commit - analyzing changed files..."
+          
+          # Get changed files between this commit and the previous one
+          if [ "$(Build.Reason)" = "PullRequest" ]; then
+            echo "Pull Request detected, comparing with target branch..."
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          else
+            echo "Direct push detected, comparing with previous commit..."
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+          
+          # Check for backend changes
+          if echo "$CHANGED_FILES" | grep -E "^(backend/|src/|\.deployment|azure-pipelines-backend\.yml|package\.json)" > /dev/null; then
+            echo "🔄 Backend changes detected!"
+            DEPLOY_BACKEND=true
+          fi
+          
+          # Check for frontend changes
+          if echo "$CHANGED_FILES" | grep -E "^(frontend/|src/|azure-pipelines-frontend\.yml)" > /dev/null; then
+            echo "🔄 Frontend changes detected!"
+            DEPLOY_FRONTEND=true
+          fi
+          
+          # Check for admin dashboard changes
+          if echo "$CHANGED_FILES" | grep -E "^(admin-dashboard/|src/|azure-pipelines-admin\.yml)" > /dev/null; then
+            echo "🔄 Admin dashboard changes detected!"
+            DEPLOY_ADMIN=true
+          fi
+          
+          # Check for template changes (affects all)
+          if echo "$CHANGED_FILES" | grep -E "^templates/" > /dev/null; then
+            echo "🔄 Template changes detected - will deploy all applications!"
+            DEPLOY_BACKEND=true
+            DEPLOY_FRONTEND=true
+            DEPLOY_ADMIN=true
+          fi
         fi
         
         # Let pipeline decide based on actual code changes

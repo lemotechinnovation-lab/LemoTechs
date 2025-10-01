@@ -28,6 +28,7 @@ resources:
         - v*.*.*
         - release-*
         - hotfix-*
+        - dev-*
 
 pool:
   name: 'Default'
@@ -41,7 +42,7 @@ variables:
   
   # Release Detection Variables
   - name: isRelease
-    ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-')) }}:
+    ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-')) }}:
       value: 'true'
     ${{ else }}:
       value: 'false'
@@ -112,6 +113,9 @@ stages:
           VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
         elif [[ "$(Build.SourceBranch)" == refs/tags/hotfix-* ]]; then
           RELEASE_TYPE="Hotfix Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/tags/dev-* ]]; then
+          RELEASE_TYPE="Development Release"
           VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
         elif [[ "$(Build.SourceBranch)" == refs/heads/release/* ]]; then
           RELEASE_TYPE="Staging Release"

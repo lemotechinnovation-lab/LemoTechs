@@ -708,6 +708,16 @@ stages:
         ls -la dist/
         echo "=== DEBUG: Files in public directory ==="
         ls -la public/
+        echo "=== DEBUG: Icons in public directory ==="
+        ls -la public/icons/ || echo "No icons directory found"
+        echo "=== DEBUG: Checking specific files ==="
+        for file in .htaccess browserconfig.xml manifest.json sw.js vite.svg; do
+          if [ -f "public/$file" ]; then
+            echo "✓ Found: public/$file"
+          else
+            echo "✗ Missing: public/$file"
+          fi
+        done
         
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-frontend/
@@ -1264,7 +1274,14 @@ stages:
         echo "=== Force copying ALL admin public files ==="
         
         # Create a comprehensive list of all files that should be in the admin deployment
+        # Note: Admin has fewer public files than frontend
         ADMIN_REQUIRED_FILES=(
+          "vite.svg"
+          "lemotech-logo.png"
+        )
+        
+        # Copy shared files from frontend public if admin doesn't have them
+        SHARED_FILES_FROM_FRONTEND=(
           "icons/android-chrome-192x192.png"
           "icons/android-chrome-512x512.png" 
           "icons/apple-touch-icon.png"
@@ -1276,17 +1293,15 @@ stages:
           "browserconfig.xml"
           "manifest.json"
           "sw.js"
-          "vite.svg"
-          "lemotech-logo.png"
         )
         
         # Ensure icons directory exists
         mkdir -p ../deploy-admin/icons
         
-        # Copy each required file explicitly
+        # Copy admin-specific files
         for file in "${ADMIN_REQUIRED_FILES[@]}"; do
           if [ -f "public/$file" ]; then
-            echo "✅ Copying admin $file..."
+            echo "✅ Copying admin-specific $file..."
             cp "public/$file" "../deploy-admin/$file" || echo "❌ Failed to copy admin $file"
             if [ -f "../deploy-admin/$file" ]; then
               echo "   ✓ Confirmed: admin $file exists in deployment"
@@ -1295,6 +1310,22 @@ stages:
             fi
           else
             echo "⚠️  Source missing: admin public/$file not found"
+          fi
+        done
+        
+        # Copy shared files from frontend public directory
+        echo "=== Copying shared files from frontend public ==="
+        for file in "${SHARED_FILES_FROM_FRONTEND[@]}"; do
+          if [ -f "../frontend/public/$file" ]; then
+            echo "✅ Copying shared $file from frontend..."
+            cp "../frontend/public/$file" "../deploy-admin/$file" || echo "❌ Failed to copy shared $file"
+            if [ -f "../deploy-admin/$file" ]; then
+              echo "   ✓ Confirmed: shared $file exists in admin deployment"
+            else
+              echo "   ✗ Missing: shared $file not found after copy"
+            fi
+          else
+            echo "⚠️  Source missing: frontend public/$file not found"
           fi
         done
         

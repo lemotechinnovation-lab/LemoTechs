@@ -920,6 +920,13 @@ stages:
 
         echo "✅ Frontend App Service deployment package ready!"
         ls -la ../deploy-frontend/
+        
+        echo "=== PRE-ARCHIVE VERIFICATION: Frontend deploy directory ==="
+        echo "Total files in deploy-frontend: $(find ../deploy-frontend -type f | wc -l)"
+        echo "All files that will be archived:"
+        find ../deploy-frontend -type f | sort
+        echo "Directory sizes:"
+        du -sh ../deploy-frontend/*
       displayName: 'Prepare Frontend App Service Package'
     
     - task: ArchiveFiles@2
@@ -930,6 +937,15 @@ stages:
         archiveFile: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
         replaceExistingArchive: true
       displayName: 'Archive Frontend Package'
+
+    - script: |
+        echo "=== VERIFYING FRONTEND ZIP CONTENTS ==="
+        cd "$(Build.ArtifactStagingDirectory)"
+        echo "ZIP file size: $(ls -lh frontend-$(Build.BuildId).zip)"
+        echo "ZIP contents:"
+        unzip -l frontend-$(Build.BuildId).zip | head -50
+        echo "=== END ZIP VERIFICATION ==="
+      displayName: 'Verify Frontend ZIP Contents'
 
     - task: AzureCLI@2
       inputs:
@@ -1535,6 +1551,13 @@ stages:
 
         echo "✅ Admin Dashboard App Service deployment package ready!"
         ls -la ../deploy-admin/
+        
+        echo "=== PRE-ARCHIVE VERIFICATION: Admin deploy directory ==="
+        echo "Total files in deploy-admin: $(find ../deploy-admin -type f | wc -l)"
+        echo "All files that will be archived:"
+        find ../deploy-admin -type f | sort
+        echo "Directory sizes:"
+        du -sh ../deploy-admin/*
       displayName: 'Prepare Admin App Service Package'
     
     - task: ArchiveFiles@2
@@ -1545,6 +1568,15 @@ stages:
         archiveFile: '$(Build.ArtifactStagingDirectory)/admin-$(Build.BuildId).zip'
         replaceExistingArchive: true
       displayName: 'Archive Admin Dashboard Package'
+
+    - script: |
+        echo "=== VERIFYING ADMIN ZIP CONTENTS ==="
+        cd "$(Build.ArtifactStagingDirectory)"
+        echo "ZIP file size: $(ls -lh admin-$(Build.BuildId).zip)"
+        echo "ZIP contents:"
+        unzip -l admin-$(Build.BuildId).zip | head -50
+        echo "=== END ZIP VERIFICATION ==="
+      displayName: 'Verify Admin ZIP Contents'
 
     - task: AzureCLI@2
       inputs:

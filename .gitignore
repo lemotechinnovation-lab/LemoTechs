@@ -153,5 +153,3 @@ test-results/
 .npm
 .eslintcache
 .stylelintcache
-frontend/dist
-admin-dashboard/dist

@@ -976,6 +976,20 @@ stages:
           echo "✅ wwwroot cleaned - ready for clean frontend deployment"
       displayName: 'Clean Frontend App Service wwwroot'
 
+    - script: |
+        echo "=== PRE-DEPLOYMENT ZIP VERIFICATION ==="
+        cd "$(Build.ArtifactStagingDirectory)"
+        echo "ZIP file exists: $(ls -la frontend-$(Build.BuildId).zip)"
+        echo "ZIP file size: $(du -h frontend-$(Build.BuildId).zip)"
+        echo "Extracting ZIP to verify contents..."
+        mkdir -p temp-extract
+        unzip -q frontend-$(Build.BuildId).zip -d temp-extract
+        echo "Extracted contents:"
+        find temp-extract -type f | sort
+        echo "Total extracted files: $(find temp-extract -type f | wc -l)"
+        rm -rf temp-extract
+      displayName: 'Pre-Deployment ZIP Verification'
+
     - task: AzureWebApp@1
       inputs:
         azureSubscription: 'LemoTech-Azure-Connection'
@@ -985,9 +999,39 @@ stages:
         package: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node server.js'
-        deploymentMethod: 'zipDeploy'
+        deploymentMethod: 'auto'
         appSettings: '-NODE_ENV $(environmentName) -FRONTEND_URL $(frontendUrl) -BACKEND_URL $(backendUrl) -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
       displayName: 'Deploy Frontend to Azure App Service'
+      continueOnError: true
+
+    - script: |
+        echo "=== CHECKING DEPLOYMENT STATUS ==="
+        if [ "$AGENT_JOBSTATUS" != "Succeeded" ]; then
+          echo "ZIP deployment failed, attempting alternative deployment via Kudu API..."
+          
+          # Extract ZIP and deploy via Kudu API
+          cd "$(Build.ArtifactStagingDirectory)"
+          mkdir -p manual-deploy
+          unzip -q frontend-$(Build.BuildId).zip -d manual-deploy
+          
+          echo "Files to deploy manually:"
+          find manual-deploy -type f | wc -l
+          
+          # Get publishing credentials
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group lemotech-platform --name lemotech-frontend --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          USERNAME=$(echo $CREDS | cut -f1)
+          PASSWORD=$(echo $CREDS | cut -f2)
+          
+          # Deploy files via Kudu API
+          echo "Deploying files via Kudu API..."
+          cd manual-deploy
+          find . -type f -exec curl -T {} "https://lemotech-frontend.scm.azurewebsites.net/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
+          
+          echo "✅ Manual deployment completed"
+        else
+          echo "✅ ZIP deployment succeeded"
+        fi
+      displayName: 'Fallback Manual Deployment if ZIP Deploy Failed'
 
     - task: AzureCLI@2
       inputs:

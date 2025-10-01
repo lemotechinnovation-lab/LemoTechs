@@ -714,13 +714,31 @@ stages:
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-frontend/
         
-        # Then ensure all public files are copied (in case Vite missed some)
-        echo "=== Ensuring all public files are included ==="
-        cp -r public/. ../deploy-frontend/ 2>/dev/null || echo "No additional public files to copy"
+        # Then explicitly copy each missing file type from public
+        echo "=== Explicitly copying public files ==="
         
-        # Remove any duplicate index.html from public (dist version should take precedence)
-        if [ -f "../deploy-frontend/index.html" ] && [ -f "public/index.html" ]; then
-          echo "Using built index.html from dist, not public version"
+        # Copy icons directory
+        if [ -d "public/icons" ]; then
+          echo "Copying icons directory..."
+          cp -r public/icons ../deploy-frontend/ || echo "Failed to copy icons"
+          ls -la ../deploy-frontend/icons/ || echo "Icons not found after copy"
+        fi
+        
+        # Copy individual files
+        for file in .htaccess browserconfig.xml manifest.json sw.js vite.svg; do
+          if [ -f "public/$file" ]; then
+            echo "Copying $file..."
+            cp "public/$file" "../deploy-frontend/" || echo "Failed to copy $file"
+            ls -la "../deploy-frontend/$file" || echo "$file not found after copy"
+          else
+            echo "Warning: public/$file not found"
+          fi
+        done
+        
+        # Copy any additional assets from public that might not be in dist
+        if [ -d "public/assets" ]; then
+          echo "Merging public/assets with dist/assets..."
+          cp -r public/assets/* ../deploy-frontend/assets/ 2>/dev/null || echo "No additional assets to merge"
         fi
         
         echo "=== DEBUG: Final files in deploy-frontend ==="
@@ -1214,13 +1232,31 @@ stages:
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-admin/
         
-        # Then ensure all public files are copied (in case Vite missed some)
-        echo "=== Ensuring all admin public files are included ==="
-        cp -r public/. ../deploy-admin/ 2>/dev/null || echo "No additional public files to copy"
+        # Then explicitly copy each missing file type from public
+        echo "=== Explicitly copying admin public files ==="
         
-        # Remove any duplicate index.html from public (dist version should take precedence)
-        if [ -f "../deploy-admin/index.html" ] && [ -f "public/index.html" ]; then
-          echo "Using built index.html from dist, not public version"
+        # Copy icons directory
+        if [ -d "public/icons" ]; then
+          echo "Copying admin icons directory..."
+          cp -r public/icons ../deploy-admin/ || echo "Failed to copy admin icons"
+          ls -la ../deploy-admin/icons/ || echo "Admin icons not found after copy"
+        fi
+        
+        # Copy individual files
+        for file in .htaccess browserconfig.xml manifest.json sw.js vite.svg; do
+          if [ -f "public/$file" ]; then
+            echo "Copying admin $file..."
+            cp "public/$file" "../deploy-admin/" || echo "Failed to copy admin $file"
+            ls -la "../deploy-admin/$file" || echo "Admin $file not found after copy"
+          else
+            echo "Warning: admin public/$file not found"
+          fi
+        done
+        
+        # Copy any additional assets from public that might not be in dist
+        if [ -d "public/assets" ]; then
+          echo "Merging admin public/assets with dist/assets..."
+          cp -r public/assets/* ../deploy-admin/assets/ 2>/dev/null || echo "No additional admin assets to merge"
         fi
         
         echo "=== DEBUG: Final files in deploy-admin ==="

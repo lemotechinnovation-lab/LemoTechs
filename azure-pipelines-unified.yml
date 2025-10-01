@@ -1033,18 +1033,67 @@ stages:
       displayName: 'Clean Frontend App Service wwwroot'
 
     - script: |
-        echo "=== PRE-DEPLOYMENT ZIP VERIFICATION ==="
-        cd "$(Build.ArtifactStagingDirectory)"
-        echo "ZIP file exists: $(ls -la frontend-$(Build.BuildId).zip)"
-        echo "ZIP file size: $(du -h frontend-$(Build.BuildId).zip)"
+        echo "=== PRE-DEPLOYMENT FRONTEND ZIP VERIFICATION ==="
+        echo "Current directory: $(pwd)"
+        echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+        
+        # Check if staging directory exists
+        if [ -d "$(Build.ArtifactStagingDirectory)" ]; then
+          echo "✅ Staging directory exists"
+          cd "$(Build.ArtifactStagingDirectory)"
+          echo "Contents of staging directory:"
+          ls -la
+        else
+          echo "❌ Staging directory does not exist"
+          exit 1
+        fi
+        
+        # Check if ZIP file exists
+        ZIP_FILE="frontend-$(Build.BuildId).zip"
+        if [ -f "$ZIP_FILE" ]; then
+          echo "✅ ZIP file exists: $(ls -la $ZIP_FILE)"
+          echo "ZIP file size: $(du -h $ZIP_FILE)"
+        else
+          echo "❌ ZIP file does not exist: $ZIP_FILE"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
+        
+        # Test ZIP file integrity
+        echo "Testing ZIP file integrity..."
+        if unzip -t "$ZIP_FILE" > /dev/null 2>&1; then
+          echo "✅ ZIP file is valid"
+        else
+          echo "❌ ZIP file is corrupted"
+          exit 1
+        fi
+        
+        # Extract and verify contents
         echo "Extracting ZIP to verify contents..."
-        mkdir -p temp-extract
-        unzip -q frontend-$(Build.BuildId).zip -d temp-extract
-        echo "Extracted contents:"
-        find temp-extract -type f | sort
-        echo "Total extracted files: $(find temp-extract -type f | wc -l)"
-        rm -rf temp-extract
-      displayName: 'Pre-Deployment ZIP Verification'
+        mkdir -p temp-extract-frontend
+        if unzip -q "$ZIP_FILE" -d temp-extract-frontend; then
+          echo "✅ ZIP extraction successful"
+          echo "Extracted contents:"
+          find temp-extract-frontend -type f | sort
+          echo "Total extracted files: $(find temp-extract-frontend -type f | wc -l)"
+          
+          # Check for key files
+          KEY_FILES=("index.html" "server.js" "package.json")
+          for file in "${KEY_FILES[@]}"; do
+            if [ -f "temp-extract-frontend/$file" ]; then
+              echo "✅ Found key file: $file"
+            else
+              echo "❌ Missing key file: $file"
+            fi
+          done
+          
+          rm -rf temp-extract-frontend
+        else
+          echo "❌ ZIP extraction failed"
+          exit 1
+        fi
+      displayName: 'Pre-Deployment Frontend ZIP Verification'
 
     - task: AzureWebApp@1
       inputs:
@@ -1741,16 +1790,65 @@ stages:
 
     - script: |
         echo "=== PRE-DEPLOYMENT ADMIN ZIP VERIFICATION ==="
-        cd "$(Build.ArtifactStagingDirectory)"
-        echo "Admin ZIP file exists: $(ls -la admin-$(Build.BuildId).zip)"
-        echo "Admin ZIP file size: $(du -h admin-$(Build.BuildId).zip)"
+        echo "Current directory: $(pwd)"
+        echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+        
+        # Check if staging directory exists
+        if [ -d "$(Build.ArtifactStagingDirectory)" ]; then
+          echo "✅ Admin staging directory exists"
+          cd "$(Build.ArtifactStagingDirectory)"
+          echo "Contents of staging directory:"
+          ls -la
+        else
+          echo "❌ Admin staging directory does not exist"
+          exit 1
+        fi
+        
+        # Check if admin ZIP file exists
+        ADMIN_ZIP_FILE="admin-$(Build.BuildId).zip"
+        if [ -f "$ADMIN_ZIP_FILE" ]; then
+          echo "✅ Admin ZIP file exists: $(ls -la $ADMIN_ZIP_FILE)"
+          echo "Admin ZIP file size: $(du -h $ADMIN_ZIP_FILE)"
+        else
+          echo "❌ Admin ZIP file does not exist: $ADMIN_ZIP_FILE"
+          echo "Available files:"
+          ls -la
+          exit 1
+        fi
+        
+        # Test admin ZIP file integrity
+        echo "Testing admin ZIP file integrity..."
+        if unzip -t "$ADMIN_ZIP_FILE" > /dev/null 2>&1; then
+          echo "✅ Admin ZIP file is valid"
+        else
+          echo "❌ Admin ZIP file is corrupted"
+          exit 1
+        fi
+        
+        # Extract and verify admin contents
         echo "Extracting admin ZIP to verify contents..."
         mkdir -p temp-extract-admin
-        unzip -q admin-$(Build.BuildId).zip -d temp-extract-admin
-        echo "Extracted admin contents:"
-        find temp-extract-admin -type f | sort
-        echo "Total extracted admin files: $(find temp-extract-admin -type f | wc -l)"
-        rm -rf temp-extract-admin
+        if unzip -q "$ADMIN_ZIP_FILE" -d temp-extract-admin; then
+          echo "✅ Admin ZIP extraction successful"
+          echo "Extracted admin contents:"
+          find temp-extract-admin -type f | sort
+          echo "Total extracted admin files: $(find temp-extract-admin -type f | wc -l)"
+          
+          # Check for key admin files
+          ADMIN_KEY_FILES=("index.html" "server.js" "package.json")
+          for file in "${ADMIN_KEY_FILES[@]}"; do
+            if [ -f "temp-extract-admin/$file" ]; then
+              echo "✅ Found key admin file: $file"
+            else
+              echo "❌ Missing key admin file: $file"
+            fi
+          done
+          
+          rm -rf temp-extract-admin
+        else
+          echo "❌ Admin ZIP extraction failed"
+          exit 1
+        fi
       displayName: 'Pre-Deployment Admin ZIP Verification'
 
     - task: AzureWebApp@1

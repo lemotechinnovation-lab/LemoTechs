@@ -613,6 +613,20 @@ stages:
         cp ../frontend/firebase.json ./ 2>/dev/null || echo "No firebase.json found"
         cp ../frontend/.firebaserc ./ 2>/dev/null || echo "No .firebaserc found"
         
+        # Copy any missing public assets that weren't included in dist
+        if [ ! -f "manifest.json" ] && [ -f "../frontend/public/manifest.json" ]; then
+          echo "📋 Copying manifest.json from public"
+          cp ../frontend/public/manifest.json ./
+        fi
+        if [ ! -f "sw.js" ] && [ -f "../frontend/public/sw.js" ]; then
+          echo "🔧 Copying service worker from public"
+          cp ../frontend/public/sw.js ./
+        fi
+        if [ ! -d "icons" ] && [ -d "../frontend/public/icons" ]; then
+          echo "🎨 Copying icons directory from public"
+          cp -r ../frontend/public/icons ./
+        fi
+        
         echo "Step 5: Verify CLEAN frontend dist deployment..."
         echo "=== FRONTEND DIST DEPLOYMENT VERIFICATION ==="
         echo "✅ index.html:" $([ -f "index.html" ] && echo "EXISTS" || echo "MISSING")
@@ -1315,8 +1329,18 @@ stages:
         unzip -q ../admin-dashboard/admin-dashboard-dist.zip
         
         # Copy essential runtime files for static hosting (admin-specific)
-        cp ../admin-dashboard/public/lemotech-logo.png ./ 2>/dev/null || echo "No admin logo found in public"
-        cp ../admin-dashboard/public/vite.svg ./ 2>/dev/null || echo "No admin vite.svg found in public"
+        if [ -f "../admin-dashboard/public/lemotech-logo.png" ]; then
+          echo "🏢 Copying admin logo from public"
+          cp ../admin-dashboard/public/lemotech-logo.png ./
+        else
+          echo "⚠️ No admin logo found in public"
+        fi
+        if [ -f "../admin-dashboard/public/vite.svg" ]; then
+          echo "⚡ Copying admin vite.svg from public"
+          cp ../admin-dashboard/public/vite.svg ./
+        else
+          echo "⚠️ No admin vite.svg found in public"
+        fi
         
         echo "Step 5: Verify CLEAN admin dashboard dist deployment..."
         echo "=== ADMIN DASHBOARD DIST DEPLOYMENT VERIFICATION ==="

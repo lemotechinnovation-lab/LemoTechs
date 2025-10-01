@@ -1145,7 +1145,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentPage }) => {
                     lineHeight: 1.4,
                   }}
                 >
-                  1,249
+                  1,248
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'center' }}>

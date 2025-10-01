@@ -25,7 +25,7 @@ export const createPaymentRequest = async (req: Request, res: Response): Promise
     if (!amount) {
       res.status(400).json({
         success: false,
-        message: 'Missing required field(s): amount'
+        message: 'Missing required field: amount'
       });
       return;
     }

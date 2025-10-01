@@ -326,7 +326,7 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     Logger.logError(error as Error, 'Change password error:');
     res.status(500).json({
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error(s)'
     });
   }
 };

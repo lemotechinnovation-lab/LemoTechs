@@ -651,24 +651,22 @@ stages:
         fi
         echo "=== END NPM INSTALL LOG REVIEW ==="
 
-        # Build (prefer package.json script if present)
-        if grep -q "\"build\"\s*:\s*\".*vite build" package.json; then
-          echo "Running npm run build"
-          npm run build --if-present 2>&1 | tee build.log || {
-            echo "❌ npm run build failed"
+        # Ensure dev dependencies are available for build
+        echo "=== Final dev dependency check ==="
+        export NPM_CONFIG_PRODUCTION=false
+        npm install --include=dev --legacy-peer-deps --unsafe-perm || echo "Dev dependency install completed with warnings"
+
+        # Build (prefer npx to ensure vite is found)
+        echo "=== Building frontend ==="
+        npx vite build 2>&1 | tee build.log || {
+          echo "❌ npx vite build failed, trying npm run build..."
+          npm run build 2>&1 | tee build.log || {
+            echo "❌ Both build methods failed"
             echo "Build log contents:"
             cat build.log || echo "No build log"
             exit 1
           }
-        else
-          echo "Running npx vite build"
-          npx vite build 2>&1 | tee build.log || {
-            echo "❌ npx vite build failed"
-            echo "Build log contents:"
-            cat build.log || echo "No build log"
-          exit 1
         }
-        fi
         
         # Verify build output
         if [ -d "dist" ]; then
@@ -1142,20 +1140,33 @@ stages:
         ls -la node_modules/.bin | head -10 || echo "No .bin directory"
         echo "=== END POST-INSTALL DEBUG ==="
 
-        # Make sure vite exists or install
+        # Ensure all dev dependencies are properly installed
+        echo "=== Ensuring dev dependencies are installed ==="
+        export NPM_CONFIG_PRODUCTION=false
+        npm install --include=dev --legacy-peer-deps --unsafe-perm || {
+          echo "Dev dependencies install failed, trying alternative approach..."
+          npm install --legacy-peer-deps --unsafe-perm
+        }
+        
+        # Check if vite is available
+        echo "=== Checking Vite availability ==="
         if ! npx vite --version >/dev/null 2>&1; then
-          echo "vite not installed — checking package.json"
-          npm ls vite || echo "vite missing; installing as devDep..."
-          npm install --save-dev vite --legacy-peer-deps --unsafe-perm
+          echo "Vite not found, installing explicitly..."
+          npm install vite @vitejs/plugin-react --save-dev --legacy-peer-deps --unsafe-perm
         fi
-        npx vite --version || true
+        
+        echo "Vite version:"
+        npx vite --version || echo "Vite still not available"
+        
+        echo "Node modules .bin contents:"
+        ls -la node_modules/.bin/ | grep vite || echo "No vite in .bin"
 
-        # Build
-        if grep -q "\"build\"\s*:\s*\".*vite build" package.json; then
-          npm run build --if-present
-        else
-          npx vite build
-        fi
+        # Build using npx to ensure we find vite
+        echo "=== Building with npx vite build ==="
+        npx vite build || {
+          echo "npx vite build failed, trying npm run build..."
+          npm run build
+        }
 
         if [ -d "dist" ]; then
           echo "✅ Admin build successful"

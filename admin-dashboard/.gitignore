@@ -7,6 +7,8 @@ pnpm-debug.log*
 
 # Build output
 build/
+dist/
+.vuepress/dist
 
 # Environment variables
 .env

@@ -158,22 +158,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     placeholder="Enter your password"
                     defaultValue="••••••••"
                     aria-label="Password"
-                    slotProps={{
-                      input: {
-                        endAdornment: (
-                          <InputAdornment position="end">
-                          <IconButton 
-                            onClick={handleTogglePassword} 
-                            edge="end" 
-                            sx={{ color: 'rgba(255,107,53,1)' }}
-                            aria-label={showPassword ? "Hide password" : "Show password"}
-                            aria-pressed={showPassword}
-                          >
-                              {showPassword ? <VisibilityOff /> : <Visibility />}
-                            </IconButton>
-                          </InputAdornment>
-                      )
-                      }
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                        <IconButton 
+                          onClick={handleTogglePassword} 
+                          edge="end" 
+                          sx={{ color: 'rgba(255,107,53,1)' }}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-pressed={showPassword}
+                        >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                    )
                     }}
                     sx={{
                       '& .MuiOutlinedInput-root': {

@@ -580,43 +580,17 @@ stages:
         export NPM_CONFIG_PRODUCTION=false
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
-        # Prefer reproducible install under CI - require package-lock.json in repo
+        # Install dependencies - prefer npm ci with package-lock.json
         echo "Checking for package-lock.json..."
         ls -la package*.json || echo "No package files found"
         
-        if [ -f package-lock.json ]; then
-          echo "✅ Using package-lock.json -> npm ci"
-          echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm ci failed, likely package-lock.json out of sync. Falling back to npm install..."
-            echo "=== NPM CI OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-            npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-              echo "❌ npm install also failed with exit code: $?"
-              echo "=== NPM INSTALL OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
-            exit 1
-            }
-          }
-        else
-          echo "⚠️  No package-lock.json; falling back to npm install"
-          echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm install failed with exit code: $?"
-            echo "=== NPM INSTALL OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
-            exit 1
-          }
-        fi
+        echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+        npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+          echo "❌ npm install failed with exit code: $?"
+          echo "=== NPM INSTALL OUTPUT ==="
+          cat npm-install.log || echo "No npm-install.log"
+          exit 1
+        }
         
         echo "=== POST-INSTALL DEBUG ==="
         echo "✅ npm install completed, checking results..."
@@ -1371,42 +1345,13 @@ stages:
         export NPM_CONFIG_PRODUCTION=false
         echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
 
-        echo "Checking for package-lock.json..."
-        ls -la package*.json || echo "No package files found"
-        
-        if [ -f package-lock.json ]; then
-          echo "✅ Using package-lock.json -> npm ci"
-          echo "Running: npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm"
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm ci failed, likely package-lock.json out of sync. Falling back to npm install..."
-            echo "=== NPM CI OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-            npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-              echo "❌ npm install also failed with exit code: $?"
-              echo "=== NPM INSTALL OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
-            exit 1
-            }
-          }
-        else
-          echo "⚠️  No package-lock.json; falling back to npm install"
-          echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-          npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-            echo "❌ npm install failed with exit code: $?"
-            echo "=== NPM INSTALL OUTPUT ==="
-            cat npm-install.log || echo "No npm-install.log"
-            echo "=== NPM LOGS ==="
-            find ~ -name "*.log" -path "*/.npm*" -exec echo "=== {} ===" \; -exec cat {} \; 2>/dev/null || echo "No npm logs found"
-            echo "=== DIRECTORY AFTER FAILED INSTALL ==="
-            ls -la
+        echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
+        npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
+          echo "❌ npm install failed with exit code: $?"
+          echo "=== NPM INSTALL OUTPUT ==="
+          cat npm-install.log || echo "No npm-install.log"
           exit 1
         }
-        fi
         
         echo "=== POST-INSTALL DEBUG ==="
         echo "✅ npm install completed, checking results..."

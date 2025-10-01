@@ -18,13 +18,7 @@
     "allowJs": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"],
-      "*": ["./node_modules/*"]
-    },
-    "typeRoots": ["./node_modules/@types"]
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src", "src/types"],
   "exclude": ["node_modules"]

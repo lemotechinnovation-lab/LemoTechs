@@ -8,5 +8,5 @@
     "types": ["node", "react", "react-dom", "vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "build", "dist"]
+  "exclude": ["node_modules", "build"]
 }

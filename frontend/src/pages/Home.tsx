@@ -85,7 +85,7 @@ export const Home = () => {
     {
       icon: <Star sx={{ color: '#FFD700' }} />,
       number: '4.9',
-      label: 'Average Rating'
+      label: 'Average Ratings'
     },
     {
       icon: <Verified sx={{ color: theme.palette.primary.main }} />,

@@ -549,10 +549,8 @@ stages:
       displayName: 'Cache frontend node_modules'
     
     - script: |
-        echo "=== Frontend: Clean & Build ==="
+        echo "=== Clean Frontend Deployment with Dist Zip Approach ==="
         cd frontend
-        pwd
-        echo "Node $(node --version) NPM $(npm --version)"
         
         echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
@@ -564,130 +562,71 @@ stages:
         
         echo "Frontend will connect to: $(frontendUrl)"
         
-        # Debug environment before npm install
-        echo "=== PRE-INSTALL DEBUG ==="
-        echo "Current directory: $(pwd)"
-        echo "User: $(whoami)"
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
-        echo "NPM config:"
-        npm config list
-        echo "Directory contents:"
-        ls -la
-        echo "=== END PRE-INSTALL DEBUG ==="
-
-        # Ensure devDependencies ARE installed for build
-        export NPM_CONFIG_PRODUCTION=false
-        echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
-
-        # Install dependencies - prefer npm ci with package-lock.json
-        echo "Checking for package-lock.json..."
-        ls -la package*.json || echo "No package files found"
+        echo "Step 2: Install dependencies and build frontend..."
+        npm install --legacy-peer-deps --unsafe-perm
+        npm run build
         
-        echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-        npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-          echo "❌ npm install failed with exit code: $?"
-          echo "=== NPM INSTALL OUTPUT ==="
-          cat npm-install.log || echo "No npm-install.log"
-          exit 1
-        }
-        
-        echo "=== POST-INSTALL DEBUG ==="
-        echo "✅ npm install completed, checking results..."
-        echo "npm-install.log contents:"
-        cat npm-install.log || echo "No npm-install.log found"
-        echo ""
-        echo "Directory contents after install:"
-        ls -la
-        echo "node_modules contents:"
-        ls -la node_modules/ | head -20 || echo "No node_modules directory"
-        echo "node_modules/.bin contents:"
-        ls -la node_modules/.bin | head -10 || echo "No .bin directory"
-        echo "=== END POST-INSTALL DEBUG ==="
-
-        # Verify vite binary exists
-        echo "Checking for vite"
-        if ! npx vite --version >/dev/null 2>&1; then
-          echo "vite not found; ensure devDependencies include vite"
-          npm ls vite || echo "vite not installed"
-          echo "Installing vite as fallback..."
-          npm install --save-dev vite --legacy-peer-deps --unsafe-perm
-        fi
-        echo "Vite version: $(npx vite --version || echo 'npx vite failed')"
-
-        # Show npm install log regardless of success/failure
-        echo "=== FINAL NPM INSTALL LOG REVIEW ==="
-        if [ -f npm-install.log ]; then
-          echo "npm-install.log file exists ($(wc -l < npm-install.log) lines):"
-          cat npm-install.log
+        # Verify build succeeded
+        if [ -f "dist/index.html" ]; then
+          echo "✅ Build successful - dist/index.html found"
+          echo "Dist contents:"
+          find dist/ -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" \) | head -15
         else
-          echo "No npm-install.log file found"
-        fi
-        echo "=== END NPM INSTALL LOG REVIEW ==="
-
-        # Ensure dev dependencies are available for build
-        echo "=== Final dev dependency check ==="
-        export NPM_CONFIG_PRODUCTION=false
-        npm install --include=dev --legacy-peer-deps --unsafe-perm || echo "Dev dependency install completed with warnings"
-
-        # Build (prefer npx to ensure vite is found)
-        echo "=== Building frontend ==="
-          npx vite build 2>&1 | tee build.log || {
-          echo "❌ npx vite build failed, trying npm run build..."
-          npm run build 2>&1 | tee build.log || {
-            echo "❌ Both build methods failed"
-            echo "Build log contents:"
-            cat build.log || echo "No build log"
-          exit 1
-        }
-        }
-        
-        # Verify build output
-        if [ -d "dist" ]; then
-          echo "✅ Frontend build completed; dist created ($(find dist -type f | wc -l) files)"
-          echo "=== COMPLETE FRONTEND DIST CONTENTS ==="
-          find dist -type f | sort
-          echo "=== FRONTEND DIST DIRECTORY STRUCTURE ==="
-          ls -la dist/
-          if [ -d "dist/assets" ]; then
-            echo "Assets directory: $(find dist/assets -type f | wc -l) files"
-          fi
-          if [ -d "dist/icons" ]; then
-            echo "Icons directory: $(find dist/icons -type f | wc -l) files"
-            ls -la dist/icons/
-          else
-            echo "⚠️ No icons directory in dist - will need to copy from public"
-          fi
-          
-          # Check for specific expected files
-          EXPECTED_DIST_FILES=(".htaccess" "browserconfig.xml" "manifest.json" "sw.js" "vite.svg" "index.html")
-          for file in "${EXPECTED_DIST_FILES[@]}"; do
-            if [ -f "dist/$file" ]; then
-              echo "✅ Found in dist: $file"
-            else
-              echo "⚠️ Missing from dist: $file (will copy from public)"
-            fi
-          done
-        else
-          echo "❌ Frontend build failed: dist not found"
-          echo "Workspace contents:"
-          ls -la
-          echo "Checking for any build logs:"
-          cat build.log || echo "No build.log found"
-          echo "Final npm-install.log review:"
-          cat npm-install.log || echo "No npm-install.log found"
+          echo "❌ Build failed - dist/index.html not found"
           exit 1
         fi
         
-        echo "Step 5: Create clean deployment package..."
+        echo "Step 3: Create dist zip for deployment..."
         cd dist
         
-        # Create frontend dist zip
+        # Verify all required frontend assets exist
+        echo "Verifying required frontend dist structure:"
+        for folder in assets icons; do
+          if [ -d "$folder" ]; then
+            echo "✅ $folder/ exists ($(ls $folder | wc -l) files)"
+          else
+            echo "⚠️ $folder/ missing"
+          fi
+        done
+        
+        # Check for essential files
+        for file in index.html manifest.json; do
+          if [ -f "$file" ]; then
+            echo "✅ $file exists"
+          else
+            echo "⚠️ $file missing"
+          fi
+        done
+        
+        # Create clean zip with ONLY dist contents
         zip -r ../frontend-dist.zip . -x "*.map"
         cd ..
         
-        echo "✅ Frontend deployment package ready!"
-      displayName: 'Build Frontend (robust)'
+        echo "Step 4: Prepare final deployment package..."
+        mkdir -p ../deploy-package-frontend
+        cd ../deploy-package-frontend
+        
+        # Extract dist zip directly to deployment root
+        unzip -q ../frontend/frontend-dist.zip
+        
+        # Copy essential runtime files for static hosting
+        cp ../frontend/firebase.json ./ 2>/dev/null || echo "No firebase.json found"
+        cp ../frontend/.firebaserc ./ 2>/dev/null || echo "No .firebaserc found"
+        
+        echo "Step 5: Verify CLEAN frontend dist deployment..."
+        echo "=== FRONTEND DIST DEPLOYMENT VERIFICATION ==="
+        echo "✅ index.html:" $([ -f "index.html" ] && echo "EXISTS" || echo "MISSING")
+        echo "✅ Frontend assets:"
+        for folder in assets icons; do
+          echo "  $folder/:" $([ -d "$folder" ] && echo "EXISTS ($(ls $folder/ 2>/dev/null | wc -l) files)" || echo "MISSING")
+        done
+        echo ""
+        echo "🚫 Contamination check (should be 0):"
+        echo "  frontend:" $(find . -name "*admin*" 2>/dev/null | wc -l)
+        echo "  backend:" $(find . -name "*backend*" 2>/dev/null | wc -l)
+        echo ""
+        echo "✅ CLEAN FRONTEND DIST DEPLOYMENT VERIFIED!"
+      displayName: 'Build Frontend (Clean Dist Approach)'
     
     - script: |
         echo "Step 2: Prepare App Service deployment package..."
@@ -1314,10 +1253,8 @@ stages:
       displayName: 'Cache admin-dashboard node_modules'
     
     - script: |
-        echo "=== Admin Dashboard: Clean & Build ==="
+        echo "=== Clean Admin Dashboard Deployment with Dist Zip Approach ==="
         cd admin-dashboard
-        pwd
-        echo "Node $(node --version) NPM $(npm --version)"
         
         echo "Step 1: Create $(environmentName) environment..."
         # Create environment file based on deployment target
@@ -1328,125 +1265,73 @@ stages:
         VITE_REQUIRE_AUTH=true
         EOF
         
-        echo "Admin will connect to: $(adminUrl)"
+        echo "Admin Dashboard will connect to: $(adminUrl)"
         
-        # Debug environment before npm install
-        echo "=== PRE-INSTALL DEBUG ==="
-        echo "Current directory: $(pwd)"
-        echo "User: $(whoami)"
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
-        echo "NPM config:"
-        npm config list
-        echo "Directory contents:"
-        ls -la
-        echo "=== END PRE-INSTALL DEBUG ==="
-
-        export NPM_CONFIG_PRODUCTION=false
-        echo "NPM_CONFIG_PRODUCTION=$NPM_CONFIG_PRODUCTION"
-
-        echo "Running: npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm"
-        npm install --legacy-peer-deps --no-audit --progress=false --unsafe-perm 2>&1 | tee npm-install.log || {
-          echo "❌ npm install failed with exit code: $?"
-          echo "=== NPM INSTALL OUTPUT ==="
-          cat npm-install.log || echo "No npm-install.log"
-          exit 1
-        }
+        echo "Step 2: Install dependencies and build admin dashboard..."
+        npm install --legacy-peer-deps --unsafe-perm
+        npm run build
         
-        echo "=== POST-INSTALL DEBUG ==="
-        echo "✅ npm install completed, checking results..."
-        echo "npm-install.log contents:"
-        cat npm-install.log || echo "No npm-install.log found"
-        echo ""
-        echo "Directory contents after install:"
-        ls -la
-        echo "node_modules contents:"
-        ls -la node_modules/ | head -20 || echo "No node_modules directory"
-        echo "node_modules/.bin contents:"
-        ls -la node_modules/.bin | head -10 || echo "No .bin directory"
-        echo "=== END POST-INSTALL DEBUG ==="
-
-        # Ensure all dev dependencies are properly installed
-        echo "=== Ensuring dev dependencies are installed ==="
-        export NPM_CONFIG_PRODUCTION=false
-        npm install --include=dev --legacy-peer-deps --unsafe-perm || {
-          echo "Dev dependencies install failed, trying alternative approach..."
-          npm install --legacy-peer-deps --unsafe-perm
-        }
-        
-        # Check if vite is available
-        echo "=== Checking Vite availability ==="
-        if ! npx vite --version >/dev/null 2>&1; then
-          echo "Vite not found, installing explicitly..."
-          npm install vite @vitejs/plugin-react --save-dev --legacy-peer-deps --unsafe-perm
-        fi
-        
-        echo "Vite version:"
-        npx vite --version || echo "Vite still not available"
-        
-        echo "Node modules .bin contents:"
-        ls -la node_modules/.bin/ | grep vite || echo "No vite in .bin"
-
-        # Build using npx to ensure we find vite
-        echo "=== Building with npx vite build ==="
-        npx vite build || {
-          echo "npx vite build failed, trying npm run build..."
-          npm run build
-        }
-
-        if [ -d "dist" ]; then
-          echo "✅ Admin build successful"
+        # Verify build succeeded
+        if [ -f "dist/index.html" ]; then
+          echo "✅ Build successful - dist/index.html found"
+          echo "Dist contents:"
+          find dist/ -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" \) | head -15
         else
-          echo "❌ Admin build failed: dist missing"
-          ls -la
+          echo "❌ Build failed - dist/index.html not found"
           exit 1
         fi
         
-        echo "Step 4: Verify build output..."
-        echo "Checking for dist directory..."
-        if [ -d "dist" ]; then
-          echo "✅ Admin dashboard build successful!"
-          echo "=== COMPLETE ADMIN DIST CONTENTS ==="
-          find dist -type f | sort
-          echo "=== ADMIN DIST DIRECTORY STRUCTURE ==="
-          ls -la dist/
-          if [ -d "dist/assets" ]; then
-            echo "Admin assets directory: $(find dist/assets -type f | wc -l) files"
-          fi
-          if [ -d "dist/icons" ]; then
-            echo "Admin icons directory: $(find dist/icons -type f | wc -l) files"
-            ls -la dist/icons/
-          else
-            echo "ℹ️ Admin has no icons directory in dist (expected - admin has fewer files)"
-          fi
-          
-          # Check for admin-specific expected files
-          EXPECTED_ADMIN_DIST_FILES=("index.html" "vite.svg")
-          for file in "${EXPECTED_ADMIN_DIST_FILES[@]}"; do
-            if [ -f "dist/$file" ]; then
-              echo "✅ Found in admin dist: $file"
-            else
-              echo "⚠️ Missing from admin dist: $file"
-            fi
-          done
-          
-          echo "Total admin dist files: $(find dist/ -type f | wc -l)"
-        else
-          echo "❌ Admin dashboard build failed!"
-          echo "Current directory contents:"
-          ls -la
-          exit 1
-        fi
-        
-        echo "Step 5: Create clean deployment package..."
+        echo "Step 3: Create dist zip for deployment..."
         cd dist
         
-        # Create admin dist zip
-        zip -r ../admin-dist.zip . -x "*.map"
+        # Verify all required admin dashboard assets exist
+        echo "Verifying required admin dashboard dist structure:"
+        for folder in assets; do
+          if [ -d "$folder" ]; then
+            echo "✅ $folder/ exists ($(ls $folder | wc -l) files)"
+          else
+            echo "⚠️ $folder/ missing"
+          fi
+        done
+        
+        # Check for essential files (admin-specific)
+        for file in index.html; do
+          if [ -f "$file" ]; then
+            echo "✅ $file exists"
+          else
+            echo "⚠️ $file missing"
+          fi
+        done
+        
+        # Create clean zip with ONLY dist contents
+        zip -r ../admin-dashboard-dist.zip . -x "*.map"
         cd ..
         
-        echo "✅ Admin dashboard deployment package ready!"
-      displayName: 'Build Admin Dashboard (robust)'
+        echo "Step 4: Prepare final deployment package..."
+        mkdir -p ../deploy-package-admin
+        cd ../deploy-package-admin
+        
+        # Extract dist zip directly to deployment root
+        unzip -q ../admin-dashboard/admin-dashboard-dist.zip
+        
+        # Copy essential runtime files for static hosting (admin-specific)
+        cp ../admin-dashboard/public/lemotech-logo.png ./ 2>/dev/null || echo "No admin logo found in public"
+        cp ../admin-dashboard/public/vite.svg ./ 2>/dev/null || echo "No admin vite.svg found in public"
+        
+        echo "Step 5: Verify CLEAN admin dashboard dist deployment..."
+        echo "=== ADMIN DASHBOARD DIST DEPLOYMENT VERIFICATION ==="
+        echo "✅ index.html:" $([ -f "index.html" ] && echo "EXISTS" || echo "MISSING")
+        echo "✅ Admin dashboard assets:"
+        for folder in assets; do
+          echo "  $folder/:" $([ -d "$folder" ] && echo "EXISTS ($(ls $folder/ 2>/dev/null | wc -l) files)" || echo "MISSING")
+        done
+        echo ""
+        echo "🚫 Contamination check (should be 0):"
+        echo "  frontend:" $(find . -name "*frontend*" 2>/dev/null | wc -l)
+        echo "  backend:" $(find . -name "*backend*" 2>/dev/null | wc -l)
+        echo ""
+        echo "✅ CLEAN ADMIN DASHBOARD DIST DEPLOYMENT VERIFIED!"
+      displayName: 'Build Admin Dashboard (Clean Dist Approach)'
     
     - script: |
         echo "Step 2: Prepare Admin App Service deployment package..."

@@ -702,7 +702,19 @@ stages:
         mkdir -p ../deploy-frontend
         
         # Copy all dist files to deployment directory (including hidden files)
+        echo "=== DEBUG: Files in dist before copy ==="
+        find dist -type f -name "*" | head -20
+        echo "=== DEBUG: Hidden files in dist ==="
+        find dist -name ".*" -type f
+        echo "=== DEBUG: All files in dist ==="
+        ls -la dist/
+        
         cp -r dist/. ../deploy-frontend/
+        
+        echo "=== DEBUG: Files copied to deploy-frontend ==="
+        find ../deploy-frontend -type f -name "*" | head -20
+        echo "=== DEBUG: Hidden files in deploy-frontend ==="
+        find ../deploy-frontend -name ".*" -type f
         
         # Create minimal Node.js server for SPA serving
         cat > ../deploy-frontend/server.js << 'EOF'
@@ -1119,7 +1131,19 @@ stages:
         mkdir -p ../deploy-admin
         
         # Copy all dist files to deployment directory (including hidden files)
+        echo "=== DEBUG: Files in admin dist before copy ==="
+        find dist -type f -name "*" | head -20
+        echo "=== DEBUG: Hidden files in admin dist ==="
+        find dist -name ".*" -type f
+        echo "=== DEBUG: All files in admin dist ==="
+        ls -la dist/
+        
         cp -r dist/. ../deploy-admin/
+        
+        echo "=== DEBUG: Files copied to deploy-admin ==="
+        find ../deploy-admin -type f -name "*" | head -20
+        echo "=== DEBUG: Hidden files in deploy-admin ==="
+        find ../deploy-admin -name ".*" -type f
         
         
         # Create minimal Node.js server for admin SPA serving

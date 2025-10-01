@@ -722,6 +722,27 @@ stages:
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-frontend/
         
+        # Verify all expected frontend dist files are present
+        echo "=== Verifying expected frontend dist files ==="
+        EXPECTED_FRONTEND_DIST=(
+          "assets"
+          "icons"
+          ".htaccess"
+          "browserconfig.xml"
+          "index.html"
+          "manifest.json"
+          "sw.js"
+          "vite.svg"
+        )
+        
+        for item in "${EXPECTED_FRONTEND_DIST[@]}"; do
+          if [ -e "../deploy-frontend/$item" ]; then
+            echo "✅ Found expected: $item"
+          else
+            echo "❌ Missing expected: $item"
+          fi
+        done
+        
         # Frontend should only use its own built dist files and public files
         echo "=== Checking what frontend build generated vs what's in public ==="
         
@@ -792,6 +813,13 @@ stages:
         find ../deploy-frontend -name ".*" -type f
         echo "=== DEBUG: Directory structure ==="
         ls -la ../deploy-frontend/
+        
+        echo "=== FINAL VERIFICATION: What will be deployed to Azure Frontend ==="
+        echo "Total files: $(find ../deploy-frontend -type f | wc -l)"
+        echo "Directory structure:"
+        find ../deploy-frontend -type d | sort
+        echo "All files being deployed:"
+        find ../deploy-frontend -type f | sort
         
         # Create minimal Node.js server for SPA serving
         cat > ../deploy-frontend/server.js << 'EOF'
@@ -1300,6 +1328,23 @@ stages:
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-admin/
         
+        # Verify all expected admin dist files are present
+        echo "=== Verifying expected admin dist files ==="
+        EXPECTED_ADMIN_DIST=(
+          "assets"
+          "index.html"
+          "lemotech-logo.png"
+          "vite.svg"
+        )
+        
+        for item in "${EXPECTED_ADMIN_DIST[@]}"; do
+          if [ -e "../deploy-admin/$item" ]; then
+            echo "✅ Found expected admin: $item"
+          else
+            echo "❌ Missing expected admin: $item"
+          fi
+        done
+        
         # Force copy ALL public files to ensure nothing is missing
         echo "=== Force copying ALL admin public files ==="
         
@@ -1373,6 +1418,13 @@ stages:
         find ../deploy-admin -name ".*" -type f
         echo "=== DEBUG: Directory structure ==="
         ls -la ../deploy-admin/
+        
+        echo "=== FINAL VERIFICATION: What will be deployed to Azure Admin ==="
+        echo "Total files: $(find ../deploy-admin -type f | wc -l)"
+        echo "Directory structure:"
+        find ../deploy-admin -type d | sort
+        echo "All files being deployed:"
+        find ../deploy-admin -type f | sort
         
         
         # Create minimal Node.js server for admin SPA serving

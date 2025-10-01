@@ -722,11 +722,25 @@ stages:
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-frontend/
         
-        # Force copy ALL public files to ensure nothing is missing
-        echo "=== Force copying ALL public files ==="
+        # Frontend should only use its own built dist files and public files
+        echo "=== Checking what frontend build generated vs what's in public ==="
         
-        # Create a comprehensive list of all files that should be in the deployment
-        REQUIRED_FILES=(
+        # Check what Vite actually built in dist
+        echo "=== What did frontend build actually generate in dist? ==="
+        find dist -type f -name "*" | sort
+        echo "=== Frontend dist directory structure ==="
+        ls -la dist/
+        if [ -d "dist/icons" ]; then
+          echo "=== Frontend dist has icons directory ==="
+          ls -la dist/icons/
+        else
+          echo "=== Frontend dist does NOT have icons directory ==="
+        fi
+        
+        # Only copy public files that are NOT already in dist (to avoid duplicates)
+        echo "=== Copying frontend's own public files (only if not in dist) ==="
+        
+        FRONTEND_PUBLIC_FILES=(
           "icons/android-chrome-192x192.png"
           "icons/android-chrome-512x512.png" 
           "icons/apple-touch-icon.png"
@@ -744,26 +758,32 @@ stages:
         # Ensure icons directory exists
         mkdir -p ../deploy-frontend/icons
         
-        # Copy each required file explicitly
-        for file in "${REQUIRED_FILES[@]}"; do
+        # Copy each public file only if it's not already in dist
+        for file in "${FRONTEND_PUBLIC_FILES[@]}"; do
           if [ -f "public/$file" ]; then
-            echo "✅ Copying $file..."
-            cp "public/$file" "../deploy-frontend/$file" || echo "❌ Failed to copy $file"
-            if [ -f "../deploy-frontend/$file" ]; then
-              echo "   ✓ Confirmed: $file exists in deployment"
+            if [ -f "dist/$file" ]; then
+              echo "ℹ️  $file already in dist - using built version"
             else
-              echo "   ✗ Missing: $file not found after copy"
+              echo "✅ Copying frontend public $file (not in dist)..."
+              cp "public/$file" "../deploy-frontend/$file" || echo "❌ Failed to copy $file"
+              if [ -f "../deploy-frontend/$file" ]; then
+                echo "   ✓ Confirmed: $file exists in deployment"
+              else
+                echo "   ✗ Missing: $file not found after copy"
+              fi
             fi
           else
-            echo "⚠️  Source missing: public/$file not found"
+            echo "⚠️  Source missing: frontend public/$file not found"
           fi
         done
         
-        # Copy any additional public assets that might exist
-        if [ -d "public/assets" ]; then
-          echo "=== Copying additional public assets ==="
+        # Copy any additional public assets that might exist (if not in dist)
+        if [ -d "public/assets" ] && [ ! -d "dist/assets" ]; then
+          echo "=== Copying additional frontend public assets (not in dist) ==="
           mkdir -p ../deploy-frontend/assets
           cp -r public/assets/* ../deploy-frontend/assets/ 2>/dev/null || echo "No additional assets found"
+        elif [ -d "public/assets" ] && [ -d "dist/assets" ]; then
+          echo "ℹ️  Assets already in dist - using built version"
         fi
         
         echo "=== DEBUG: Final files in deploy-frontend ==="

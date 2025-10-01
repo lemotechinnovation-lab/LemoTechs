@@ -69,9 +69,9 @@ switch ($Type) {
         $DefaultMessage = "🧪 UAT Release v$Version"
         $Environment = "UAT"
         $Domains = @(
-            "Frontend: https://lemotech-frontend-uat.southafricanorth-01.azurewebsites.net",
+            "Frontend: https://lemotech-frontend-uat.azurewebsites.net",
             "Backend:  https://lemotech-api-uat.azurewebsites.net",
-            "Admin:    https://lemotech-admin-uat.southafricanorth-01.azurewebsites.net"
+            "Admin:    https://lemotech-admin-uat.azurewebsites.net"
         )
     }
     "qa" {
@@ -79,9 +79,9 @@ switch ($Type) {
         $DefaultMessage = "🔍 QA Release v$Version"
         $Environment = "QA"
         $Domains = @(
-            "Frontend: https://lemotech-frontend-qa.southafricanorth-01.azurewebsites.net",
+            "Frontend: https://lemotech-frontend-qa.azurewebsites.net",
             "Backend:  https://lemotech-api-qa.azurewebsites.net",
-            "Admin:    https://lemotech-admin-qa.southafricanorth-01.azurewebsites.net"
+            "Admin:    https://lemotech-admin-qa.azurewebsites.net"
         )
     }
 }

@@ -816,7 +816,7 @@ stages:
                     cp -r public/icons/* "../deploy-frontend/icons/" 2>/dev/null || echo "  No files in icons directory"
                   fi
                   ;;
-"browserconfig.xml"|"manifest.json"|"sw.js"|"vite.svg")
+                "browserconfig.xml"|"manifest.json"|"sw.js"|"vite.svg")
                   echo "  Searching for $item in public..."
                   find public -name "$item" -type f 2>/dev/null | while read found_file; do
                     echo "  Found: $found_file, copying..."

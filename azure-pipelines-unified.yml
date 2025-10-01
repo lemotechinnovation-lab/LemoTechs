@@ -74,8 +74,12 @@ stages:
       displayName: 'Checkout with History'
     
     - script: |
+        echo "Fetching latest code from Git..."
+        git fetch origin
+        git reset --hard origin/main  # or your branch name
+
         echo "Ensuring proper ownership after checkout..."
-        sudo chown -R $(whoami):$(whoami) . || echo "repo ownership fix done"
+        sudo chown -R $(whoami):$(whoami) . || echo "repo ownership fix failed or not needed"
       displayName: 'Fix Repository Ownership'
     
     - script: |

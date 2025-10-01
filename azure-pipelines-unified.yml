@@ -74,9 +74,9 @@ variables:
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://www.lemotechinnovations.co.za'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
-      value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
+      value: 'https://lemotech-frontend-uat.southafricanorth-01.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
-      value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
+      value: 'https://lemotech-frontend-qa.southafricanorth-01.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
   
@@ -85,8 +85,8 @@ variables:
       value: 'https://api.lemotechinnovations.co.za'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
       value: 'https://lemotech-api-uat.azurewebsites.net'
-    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
-      value: 'https://lemotech-api-backend.azurewebsites.net'
+      ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+        value: 'https://lemotech-api-qa.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-api-backend.azurewebsites.net'
   
@@ -94,9 +94,9 @@ variables:
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://admin.lemotechinnovations.co.za'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
-      value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
+      value: 'https://lemotech-admin-uat.southafricanorth-01.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
-      value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
+      value: 'https://lemotech-admin-qa.southafricanorth-01.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
   

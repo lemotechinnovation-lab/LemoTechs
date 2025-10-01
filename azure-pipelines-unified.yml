@@ -756,7 +756,6 @@ stages:
         EXPECTED_FRONTEND_DIST=(
           "assets"
           "icons"
-          ".htaccess"
           "browserconfig.xml"
           "index.html"
           "manifest.json"
@@ -777,24 +776,66 @@ stages:
         # PHASE 3: Force copy missing files from public if they exist
         if [ ${#MISSING_FILES[@]} -gt 0 ]; then
           echo "=== FORCE COPYING MISSING FILES FROM PUBLIC ==="
+          echo "Current directory: $(pwd)"
+          echo "Checking public directory contents:"
+          ls -la public/ || echo "No public directory found"
+          
           for item in "${MISSING_FILES[@]}"; do
+            echo "Processing missing item: $item"
+            
             if [ -e "public/$item" ]; then
               echo "🔄 Force copying missing $item from public..."
               if [ -d "public/$item" ]; then
+                echo "  Copying directory: public/$item -> ../deploy-frontend/$item"
                 mkdir -p "../deploy-frontend/$item"
                 cp -r "public/$item/." "../deploy-frontend/$item/"
               else
+                echo "  Copying file: public/$item -> ../deploy-frontend/$item"
                 cp "public/$item" "../deploy-frontend/$item"
               fi
               
               # Verify the copy worked
               if [ -e "../deploy-frontend/$item" ]; then
                 echo "✅ Successfully copied $item from public"
+                if [ -d "../deploy-frontend/$item" ]; then
+                  echo "  Directory contents: $(ls -la ../deploy-frontend/$item | wc -l) items"
+                fi
               else
                 echo "❌ Failed to copy $item from public"
               fi
             else
-              echo "⚠️ $item not found in public directory either"
+              echo "⚠️ $item not found in public directory"
+              echo "  Checking if it exists with different path..."
+              
+              # Special handling for known files
+              case "$item" in
+                "icons")
+                  if [ -d "public/icons" ]; then
+                    echo "  Found icons directory, copying..."
+                    mkdir -p "../deploy-frontend/icons"
+                    cp -r public/icons/* "../deploy-frontend/icons/" 2>/dev/null || echo "  No files in icons directory"
+                  fi
+                  ;;
+"browserconfig.xml"|"manifest.json"|"sw.js"|"vite.svg")
+                  echo "  Searching for $item in public..."
+                  find public -name "$item" -type f 2>/dev/null | while read found_file; do
+                    echo "  Found: $found_file, copying..."
+                    cp "$found_file" "../deploy-frontend/$item"
+                  done
+                  ;;
+              esac
+            fi
+          done
+          
+          echo "=== POST-COPY VERIFICATION ==="
+          echo "Final deploy-frontend contents:"
+          find ../deploy-frontend -type f | wc -l
+          echo "Checking for expected files again:"
+          for item in "${EXPECTED_FRONTEND_DIST[@]}"; do
+            if [ -e "../deploy-frontend/$item" ]; then
+              echo "✅ Now found: $item"
+            else
+              echo "❌ Still missing: $item"
             fi
           done
         fi
@@ -1520,24 +1561,62 @@ stages:
         # PHASE 3: Force copy missing admin files from public if they exist
         if [ ${#MISSING_ADMIN_FILES[@]} -gt 0 ]; then
           echo "=== FORCE COPYING MISSING ADMIN FILES FROM PUBLIC ==="
+          echo "Current admin directory: $(pwd)"
+          echo "Checking admin public directory contents:"
+          ls -la public/ || echo "No admin public directory found"
+          
           for item in "${MISSING_ADMIN_FILES[@]}"; do
+            echo "Processing missing admin item: $item"
+            
             if [ -e "public/$item" ]; then
               echo "🔄 Force copying missing admin $item from public..."
               if [ -d "public/$item" ]; then
+                echo "  Copying admin directory: public/$item -> ../deploy-admin/$item"
                 mkdir -p "../deploy-admin/$item"
                 cp -r "public/$item/." "../deploy-admin/$item/"
               else
+                echo "  Copying admin file: public/$item -> ../deploy-admin/$item"
                 cp "public/$item" "../deploy-admin/$item"
               fi
               
               # Verify the admin copy worked
               if [ -e "../deploy-admin/$item" ]; then
                 echo "✅ Successfully copied admin $item from public"
+                if [ -d "../deploy-admin/$item" ]; then
+                  echo "  Admin directory contents: $(ls -la ../deploy-admin/$item | wc -l) items"
+                fi
               else
                 echo "❌ Failed to copy admin $item from public"
               fi
             else
-              echo "ℹ️ Admin $item not found in public directory (this may be normal for admin)"
+              echo "ℹ️ Admin $item not found in public directory"
+              echo "  This is normal for admin - it has fewer public files than frontend"
+              
+              # For admin, we expect fewer files, so this is usually OK
+              case "$item" in
+                "lemotech-logo.png"|"vite.svg")
+                  echo "  Searching for admin $item in public..."
+                  find public -name "$item" -type f 2>/dev/null | while read found_file; do
+                    echo "  Found admin file: $found_file, copying..."
+                    cp "$found_file" "../deploy-admin/$item"
+                  done
+                  ;;
+                *)
+                  echo "  Admin doesn't need $item - this is expected"
+                  ;;
+              esac
+            fi
+          done
+          
+          echo "=== ADMIN POST-COPY VERIFICATION ==="
+          echo "Final deploy-admin contents:"
+          find ../deploy-admin -type f | wc -l
+          echo "Checking for expected admin files again:"
+          for item in "${EXPECTED_ADMIN_DIST[@]}"; do
+            if [ -e "../deploy-admin/$item" ]; then
+              echo "✅ Now found admin: $item"
+            else
+              echo "ℹ️ Still missing admin: $item (may be normal)"
             fi
           done
         fi

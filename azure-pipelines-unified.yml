@@ -1266,6 +1266,16 @@ stages:
         ls -la dist/
         echo "=== DEBUG: Files in admin public directory ==="
         ls -la public/
+        echo "=== DEBUG: What did admin build actually generate in dist? ==="
+        find dist -type f -name "*" | sort
+        echo "=== DEBUG: Admin dist directory structure ==="
+        ls -la dist/
+        if [ -d "dist/icons" ]; then
+          echo "=== DEBUG: Admin dist has icons directory ==="
+          ls -la dist/icons/
+        else
+          echo "=== DEBUG: Admin dist does NOT have icons directory ==="
+        fi
         
         # First copy all dist files (built files)
         cp -r dist/. ../deploy-admin/
@@ -1273,15 +1283,15 @@ stages:
         # Force copy ALL public files to ensure nothing is missing
         echo "=== Force copying ALL admin public files ==="
         
-        # Create a comprehensive list of all files that should be in the admin deployment
-        # Note: Admin has fewer public files than frontend
-        ADMIN_REQUIRED_FILES=(
+        # Admin should only use its own built dist files and public files
+        # Check what files exist in admin's own public directory
+        ADMIN_PUBLIC_FILES=(
           "vite.svg"
           "lemotech-logo.png"
         )
         
-        # Copy shared files from frontend public if admin doesn't have them
-        SHARED_FILES_FROM_FRONTEND=(
+        # Check if admin has additional public files that should be copied
+        POTENTIAL_ADMIN_FILES=(
           "icons/android-chrome-192x192.png"
           "icons/android-chrome-512x512.png" 
           "icons/apple-touch-icon.png"
@@ -1298,10 +1308,11 @@ stages:
         # Ensure icons directory exists
         mkdir -p ../deploy-admin/icons
         
-        # Copy admin-specific files
-        for file in "${ADMIN_REQUIRED_FILES[@]}"; do
+        # Copy admin's own public files only
+        echo "=== Copying admin's own public files ==="
+        for file in "${ADMIN_PUBLIC_FILES[@]}"; do
           if [ -f "public/$file" ]; then
-            echo "✅ Copying admin-specific $file..."
+            echo "✅ Copying admin's own $file..."
             cp "public/$file" "../deploy-admin/$file" || echo "❌ Failed to copy admin $file"
             if [ -f "../deploy-admin/$file" ]; then
               echo "   ✓ Confirmed: admin $file exists in deployment"
@@ -1313,19 +1324,19 @@ stages:
           fi
         done
         
-        # Copy shared files from frontend public directory
-        echo "=== Copying shared files from frontend public ==="
-        for file in "${SHARED_FILES_FROM_FRONTEND[@]}"; do
-          if [ -f "../frontend/public/$file" ]; then
-            echo "✅ Copying shared $file from frontend..."
-            cp "../frontend/public/$file" "../deploy-admin/$file" || echo "❌ Failed to copy shared $file"
+        # Check if admin has any additional files that should be copied
+        echo "=== Checking for additional admin public files ==="
+        for file in "${POTENTIAL_ADMIN_FILES[@]}"; do
+          if [ -f "public/$file" ]; then
+            echo "✅ Found additional admin file: $file - copying..."
+            cp "public/$file" "../deploy-admin/$file" || echo "❌ Failed to copy additional admin $file"
             if [ -f "../deploy-admin/$file" ]; then
-              echo "   ✓ Confirmed: shared $file exists in admin deployment"
+              echo "   ✓ Confirmed: additional admin $file exists in deployment"
             else
-              echo "   ✗ Missing: shared $file not found after copy"
+              echo "   ✗ Missing: additional admin $file not found after copy"
             fi
           else
-            echo "⚠️  Source missing: frontend public/$file not found"
+            echo "ℹ️  Admin doesn't have: public/$file (this is normal)"
           fi
         done
         

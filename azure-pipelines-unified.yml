@@ -29,6 +29,8 @@ resources:
         - release-*
         - hotfix-*
         - dev-*
+        - uat-*
+        - qa-*
 
 pool:
   name: 'Default'
@@ -42,7 +44,7 @@ variables:
   
   # Release Detection Variables
   - name: isRelease
-    ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-')) }}:
+    ${{ if or(startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-'), startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-')) }}:
       value: 'true'
     ${{ else }}:
       value: 'false'
@@ -60,6 +62,10 @@ variables:
       value: 'staging'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-') }}:
       value: 'hotfix'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
+      value: 'uat'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+      value: 'qa'
     ${{ else }}:
       value: 'development'
   
@@ -67,18 +73,30 @@ variables:
   - name: frontendUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://www.lemotechinnovations.co.za'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
+      value: 'https://lemotech-frontend-uat.southafricanorth-01.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+      value: 'https://lemotech-frontend-qa.southafricanorth-01.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net'
   
   - name: backendUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://api.lemotechinnovations.co.za'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
+      value: 'https://lemotech-api-uat.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+      value: 'https://lemotech-api-qa.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-api-backend.azurewebsites.net'
   
   - name: adminUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://admin.lemotechinnovations.co.za'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/uat-') }}:
+      value: 'https://lemotech-admin-uat.southafricanorth-01.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+      value: 'https://lemotech-admin-qa.southafricanorth-01.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
   
@@ -116,6 +134,12 @@ stages:
           VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
         elif [[ "$(Build.SourceBranch)" == refs/tags/dev-* ]]; then
           RELEASE_TYPE="Development Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/tags/uat-* ]]; then
+          RELEASE_TYPE="UAT Release"
+          VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
+        elif [[ "$(Build.SourceBranch)" == refs/tags/qa-* ]]; then
+          RELEASE_TYPE="QA Release"
           VERSION=$(echo "$(Build.SourceBranch)" | sed 's|refs/tags/||')
         elif [[ "$(Build.SourceBranch)" == refs/heads/release/* ]]; then
           RELEASE_TYPE="Staging Release"

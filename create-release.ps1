@@ -5,8 +5,8 @@ param(
     [Parameter(Mandatory=$true, HelpMessage="Version number (e.g., 1.2.3)")]
     [string]$Version,
     
-    [Parameter(Mandatory=$false, HelpMessage="Release type: production, release-candidate, hotfix, or development")]
-    [ValidateSet("production", "release-candidate", "hotfix", "development")]
+    [Parameter(Mandatory=$false, HelpMessage="Release type: production, release-candidate, hotfix, development, uat, or qa")]
+    [ValidateSet("production", "release-candidate", "hotfix", "development", "uat", "qa")]
     [string]$Type = "production",
     
     [Parameter(Mandatory=$false, HelpMessage="Custom release message")]
@@ -62,6 +62,26 @@ switch ($Type) {
             "Frontend: https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net",
             "Backend:  https://lemotech-api-backend.azurewebsites.net",
             "Admin:    https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net"
+        )
+    }
+    "uat" {
+        $TagName = "uat-v$Version"
+        $DefaultMessage = "🧪 UAT Release v$Version"
+        $Environment = "UAT"
+        $Domains = @(
+            "Frontend: https://lemotech-frontend-uat.southafricanorth-01.azurewebsites.net",
+            "Backend:  https://lemotech-api-uat.azurewebsites.net",
+            "Admin:    https://lemotech-admin-uat.southafricanorth-01.azurewebsites.net"
+        )
+    }
+    "qa" {
+        $TagName = "qa-v$Version"
+        $DefaultMessage = "🔍 QA Release v$Version"
+        $Environment = "QA"
+        $Domains = @(
+            "Frontend: https://lemotech-frontend-qa.southafricanorth-01.azurewebsites.net",
+            "Backend:  https://lemotech-api-qa.azurewebsites.net",
+            "Admin:    https://lemotech-admin-qa.southafricanorth-01.azurewebsites.net"
         )
     }
 }

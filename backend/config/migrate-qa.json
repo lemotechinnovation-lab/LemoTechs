@@ -1,0 +1,14 @@
+{
+  "migrations": {
+    "directory": "src/infrastructure/migrations",
+    "table": "pgmigrations"
+  },
+  "db": {
+    "host": "lemotech-db-qa.postgres.database.azure.com",
+    "port": 5432,
+    "database": "lemotech_innovations",
+    "user": "lemotech_admin",
+    "password": "SecureDB2024!",
+    "ssl": true
+  }
+}

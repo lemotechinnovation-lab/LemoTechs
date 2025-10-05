@@ -4,10 +4,11 @@
     "table": "pgmigrations"
   },
   "db": {
-    "host": "localhost",
-    "port": 5435,
+    "host": "lemotech-db-uat.postgres.database.azure.com",
+    "port": 5432,
     "database": "lemotech_innovations",
-    "user": "postgres",
-    "password": "postgres"
+    "user": "lemotech_admin",
+    "password": "SecureDB2024!",
+    "ssl": true
   }
 }

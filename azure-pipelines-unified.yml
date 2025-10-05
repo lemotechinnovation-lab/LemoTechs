@@ -2,7 +2,7 @@
 # Intelligent deployment that detects changes and deploys only what's needed
 # Updated for container deployment - UAT Test
 
-# CI Trigger - Runs on code pushes
+# CI/CD Trigger - Runs on code pushes and tag creation
 trigger:
   branches:
     include:
@@ -18,20 +18,14 @@ trigger:
     - README.md
     - "*.md"
 
-# Release Trigger - Runs on tag creation for production releases
+# Pull Request trigger disabled
 pr: none
 
-# Resource triggers for release tags and branches
+# Resource configuration for additional triggers
 resources:
   repositories:
   - repository: self
     trigger:
-      branches:
-        include:
-        - master
-        - dev
-        - qa
-        - release/*
       tags:
         include:
         - v*.*.*
@@ -154,6 +148,43 @@ variables:
       value: 'https://lemotech-admin-qa.scm.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.scm.southafricanorth-01.azurewebsites.net'
+  
+  # App Service names and resource groups
+  - name: backendAppName
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'lemotech-api-backend'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'lemotech-api-uat'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'lemotech-api-qa'
+    ${{ else }}:
+      value: 'lemotech-api-backend'
+  
+  - name: frontendAppName
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'lemotech-frontend'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'lemotech-frontend-uat'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'lemotech-frontend-qa'
+    ${{ else }}:
+      value: 'lemotech-frontend-avbgchgjexfdbpa7'
+  
+  - name: adminAppName
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'lemotech-admin'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'lemotech-admin-uat'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'lemotech-admin-qa'
+    ${{ else }}:
+      value: 'lemotech-admin-aya0hbfgc2dbh8c0'
+  
+  - name: resourceGroup
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'lemotech-platform'
+    ${{ else }}:
+      value: 'lemotech-test-plan'
   
   # DNS settings for custom domain validation
   - name: dnsZoneName
@@ -612,13 +643,13 @@ stages:
       inputs:
         azureSubscription: 'LemoTech-Azure-Connection'
         appType: 'webAppLinux'
-        appName: 'lemotech-api-backend'
-        resourceGroupName: 'lemotech-platform'
+        appName: '$(backendAppName)'
+        resourceGroupName: '$(resourceGroup)'
         package: '$(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node app.js'
         deploymentMethod: 'zipDeploy'
-        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV production -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
+        appSettings: '-SCM_DO_BUILD_DURING_DEPLOYMENT false -ENABLE_ORYX_BUILD false -WEBSITE_DISABLE_SCM_BUILD true -WEBSITE_RUN_FROM_PACKAGE 0 -WEBSITE_DISABLE_DEPLOYMENT_BUILD true -NODE_ENV $(environmentName) -PORT 8000 -PAYFAST_MERCHANT_ID dummy -PAYFAST_MERCHANT_KEY dummy -PAYFAST_PASSPHRASE dummy -WEBSITE_NODE_DEFAULT_VERSION ~20 -WEBSITE_HTTPLOGGING_RETENTION_DAYS 3'
       displayName: 'Deploy to Azure App Service'
     
     - task: AzureCLI@2
@@ -630,14 +661,14 @@ stages:
           echo "=== Cleaning wwwroot folder completely ==="
           
           # Stop the app first
-          az webapp stop --resource-group lemotech-platform --name lemotech-api-backend
+          az webapp stop --resource-group $(resourceGroup) --name $(backendAppName)
           echo "✅ App stopped for clean deployment"
           
           # Clean wwwroot via Kudu API
           echo "Cleaning /site/wwwroot/ completely..."
           
           # Get publishing credentials
-          CREDS=$(az webapp deployment list-publishing-profiles --resource-group lemotech-platform --name lemotech-api-backend --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
+          CREDS=$(az webapp deployment list-publishing-profiles --resource-group $(resourceGroup) --name $(backendAppName) --query "[?publishMethod=='FTP'].{username:userName,password:userPWD}" --output tsv)
           USERNAME=$(echo $CREDS | cut -f1)
           PASSWORD=$(echo $CREDS | cut -f2)
           
@@ -660,14 +691,14 @@ stages:
           # Check current App Service plan
           echo "Current App Service Plan:"
           az appservice plan show \
-            --resource-group lemotech-platform \
-            --name $(az webapp show --resource-group lemotech-platform --name lemotech-api-backend --query appServicePlanId --output tsv | xargs basename) \
+            --resource-group $(resourceGroup) \
+            --name $(az webapp show --resource-group $(resourceGroup) --name $(backendAppName) --query appServicePlanId --output tsv | xargs basename) \
             --query "{name:name, tier:sku.tier, size:sku.size, capacity:sku.capacity}"
           
           # Set timeout and performance settings
           az webapp config appsettings set \
-            --resource-group lemotech-platform \
-            --name lemotech-api-backend \
+            --resource-group $(resourceGroup) \
+            --name $(backendAppName) \
             --settings \
               SCM_COMMAND_IDLE_TIMEOUT=1200 \
               WEBJOBS_IDLE_TIMEOUT=1200 \
@@ -685,7 +716,7 @@ stages:
           echo "✅ Timeout and performance settings configured"
           
           # Start the app after clean deployment
-          az webapp start --resource-group lemotech-platform --name lemotech-api-backend
+          az webapp start --resource-group $(resourceGroup) --name $(backendAppName)
           echo "✅ App restarted with clean backend deployment"
       displayName: 'Configure App Service and Restart'
     
@@ -1279,8 +1310,8 @@ stages:
       inputs:
         azureSubscription: 'LemoTech-Azure-Connection'
         appType: 'webAppLinux'
-        appName: 'lemotech-frontend'
-        resourceGroupName: 'lemotech-platform'
+        appName: '$(frontendAppName)'
+        resourceGroupName: '$(resourceGroup)'
         package: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node server.js'
@@ -2000,8 +2031,8 @@ stages:
       inputs:
         azureSubscription: 'LemoTech-Azure-Connection'
         appType: 'webAppLinux'
-        appName: 'lemotech-admin'
-        resourceGroupName: 'lemotech-platform'
+        appName: '$(adminAppName)'
+        resourceGroupName: '$(resourceGroup)'
         package: '$(Build.ArtifactStagingDirectory)/admin-$(Build.BuildId).zip'
         runtimeStack: 'NODE|20-lts'
         startUpCommand: 'node server.js'

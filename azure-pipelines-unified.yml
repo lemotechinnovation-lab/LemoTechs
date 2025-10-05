@@ -186,6 +186,12 @@ variables:
     ${{ else }}:
       value: 'lemotech-test-plan'
   
+  - name: azureSubscription
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'LemoTech-Azure-Connection'
+    ${{ else }}:
+      value: 'LemoTech-Azure-Connection-UAT'
+  
   # DNS settings for custom domain validation
   - name: dnsZoneName
     value: 'lemotechinnovations.co.za'
@@ -641,7 +647,7 @@ stages:
     
     - task: AzureWebApp@1
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         appType: 'webAppLinux'
         appName: '$(backendAppName)'
         resourceGroupName: '$(resourceGroup)'
@@ -654,7 +660,7 @@ stages:
     
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -682,7 +688,7 @@ stages:
     
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -1216,7 +1222,7 @@ stages:
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -1308,7 +1314,7 @@ stages:
 
     - task: AzureWebApp@1
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         appType: 'webAppLinux'
         appName: '$(frontendAppName)'
         resourceGroupName: '$(resourceGroup)'
@@ -1351,7 +1357,7 @@ stages:
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -1376,7 +1382,7 @@ stages:
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -1937,7 +1943,7 @@ stages:
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
@@ -2029,7 +2035,7 @@ stages:
 
     - task: AzureWebApp@1
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         appType: 'webAppLinux'
         appName: '$(adminAppName)'
         resourceGroupName: '$(resourceGroup)'
@@ -2072,7 +2078,7 @@ stages:
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'LemoTech-Azure-Connection'
+        azureSubscription: '$(azureSubscription)'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |

@@ -108,6 +108,37 @@ variables:
     ${{ else }}:
       value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net'
   
+  # SCM URLs for Kudu API access
+  - name: backendScmUrl
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'https://lemotech-api-backend.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'https://lemotech-api-uat.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-api-qa.scm.azurewebsites.net'
+    ${{ else }}:
+      value: 'https://lemotech-api-backend.scm.azurewebsites.net'
+  
+  - name: frontendScmUrl
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'https://lemotech-frontend.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'https://lemotech-frontend-uat.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-frontend-qa.scm.azurewebsites.net'
+    ${{ else }}:
+      value: 'https://lemotech-frontend-avbgchgjexfdbpa7.scm.southafricanorth-01.azurewebsites.net'
+  
+  - name: adminScmUrl
+    ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
+      value: 'https://lemotech-admin.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'https://lemotech-admin-uat.scm.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-admin-qa.scm.azurewebsites.net'
+    ${{ else }}:
+      value: 'https://lemotech-admin-aya0hbfgc2dbh8c0.scm.southafricanorth-01.azurewebsites.net'
+  
   # DNS settings for custom domain validation
   - name: dnsZoneName
     value: 'lemotechinnovations.co.za'
@@ -595,7 +626,7 @@ stages:
           PASSWORD=$(echo $CREDS | cut -f2)
           
           # Clean wwwroot via Kudu REST API
-          curl -X DELETE "https://lemotech-api-backend.scm.azurewebsites.net/api/vfs/site/wwwroot/" \
+          curl -X DELETE "$(backendScmUrl)/api/vfs/site/wwwroot/" \
             -u "$USERNAME:$PASSWORD" \
             -H "If-Match: *" || echo "Clean attempt via API"
           
@@ -1158,7 +1189,7 @@ stages:
           PASSWORD=$(echo $CREDS | cut -f2)
           
           # Clean wwwroot via Kudu REST API
-          curl -X DELETE "https://lemotech-frontend-avbgchgjexfdbpa7.scm.southafricanorth-01.azurewebsites.net/api/vfs/site/wwwroot/" \
+          curl -X DELETE "$(frontendScmUrl)/api/vfs/site/wwwroot/" \
             -u "$USERNAME:$PASSWORD" \
             -H "If-Match: *" || echo "Clean attempt via API completed"
           
@@ -1263,7 +1294,7 @@ stages:
           # Deploy files via Kudu API
           echo "Deploying files via Kudu API..."
           cd manual-deploy
-          find . -type f -exec curl -T {} "https://lemotech-frontend-avbgchgjexfdbpa7.scm.southafricanorth-01.azurewebsites.net/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
+          find . -type f -exec curl -T {} "$(frontendScmUrl)/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
           
           echo "✅ Manual deployment completed"
         else
@@ -1338,7 +1369,7 @@ stages:
         az webapp show --name lemotech-frontend --resource-group lemotech-platform --query "{state:state,hostNames:hostNames}" --output table
         
         # Check if the default Azure URL works first
-        DEFAULT_URL="https://lemotech-frontend-avbgchgjexfdbpa7.southafricanorth-01.azurewebsites.net/"
+        DEFAULT_URL="$(frontendUrl)/"
         echo "=== Testing default Azure URL: $DEFAULT_URL ==="
         curl -I "$DEFAULT_URL" || echo "Default URL not responding"
         
@@ -1879,7 +1910,7 @@ stages:
           PASSWORD=$(echo $CREDS | cut -f2)
           
           # Clean wwwroot via Kudu REST API
-          curl -X DELETE "https://lemotech-admin-aya0hbfgc2dbh8c0.scm.southafricanorth-01.azurewebsites.net/api/vfs/site/wwwroot/" \
+          curl -X DELETE "$(adminScmUrl)/api/vfs/site/wwwroot/" \
             -u "$USERNAME:$PASSWORD" \
             -H "If-Match: *" || echo "Clean attempt via API completed"
           
@@ -1984,7 +2015,7 @@ stages:
           # Deploy files via Kudu API
           echo "Deploying admin files via Kudu API..."
           cd manual-deploy-admin
-          find . -type f -exec curl -T {} "https://lemotech-admin-aya0hbfgc2dbh8c0.scm.southafricanorth-01.azurewebsites.net/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
+          find . -type f -exec curl -T {} "$(adminScmUrl)/api/vfs/site/wwwroot/{}" -u "$USERNAME:$PASSWORD" \;
           
           echo "✅ Manual admin deployment completed"
         else
@@ -2034,7 +2065,7 @@ stages:
         az webapp show --name lemotech-admin --resource-group lemotech-platform --query "{state:state,hostNames:hostNames}" --output table
         
         # Check if the default Azure URL works first
-        DEFAULT_URL="lemotech-admin-aya0hbfgc2dbh8c0.southafricanorth-01.azurewebsites.net"
+        DEFAULT_URL="$(adminUrl)"
         echo "=== Testing default Azure URL: $DEFAULT_URL ==="
         curl -I "$DEFAULT_URL" || echo "Default URL not responding"
         

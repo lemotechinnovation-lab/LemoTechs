@@ -68,6 +68,10 @@ variables:
       value: 'production'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}:
       value: 'staging'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'uat'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'qa'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-') }}:
       value: 'hotfix'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-') }}:
@@ -81,6 +85,10 @@ variables:
   - name: frontendUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://www.lemotechinnovations.co.za'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'https://lemotech-frontend-uat.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-frontend-qa.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-') }}:
       value: 'https://lemotech-frontend-uat.southafricanorth-01.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
@@ -91,16 +99,24 @@ variables:
   - name: backendUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://api.lemotechinnovations.co.za'
-    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-') }}:
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
       value: 'https://lemotech-api-uat.azurewebsites.net'
-      ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
-        value: 'https://lemotech-api-qa.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-api-qa.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-') }}:
+      value: 'https://lemotech-api-uat.southafricanorth-01.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:
+      value: 'https://lemotech-api-qa.southafricanorth-01.azurewebsites.net'
     ${{ else }}:
       value: 'https://lemotech-api-backend.azurewebsites.net'
   
   - name: adminUrl
     ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/master'), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')) }}:
       value: 'https://admin.lemotechinnovations.co.za'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
+      value: 'https://lemotech-admin-uat.azurewebsites.net'
+    ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
+      value: 'https://lemotech-admin-qa.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/dev-') }}:
       value: 'https://lemotech-admin-uat.southafricanorth-01.azurewebsites.net'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/qa-') }}:

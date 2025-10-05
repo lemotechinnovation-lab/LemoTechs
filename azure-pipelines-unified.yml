@@ -69,7 +69,7 @@ variables:
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}:
       value: 'staging'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/dev') }}:
-      value: 'uat'
+      value: 'dev'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/heads/qa') }}:
       value: 'qa'
     ${{ elseif startsWith(variables['Build.SourceBranch'], 'refs/tags/hotfix-') }}:

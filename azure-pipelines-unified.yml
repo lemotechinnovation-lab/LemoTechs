@@ -9,6 +9,8 @@ trigger:
     - master
     - main
     - develop
+    - dev
+    - qa
     - release/*
   paths:
     exclude:
@@ -19,11 +21,17 @@ trigger:
 # Release Trigger - Runs on tag creation for production releases
 pr: none
 
-# Resource triggers for release tags
+# Resource triggers for release tags and branches
 resources:
   repositories:
   - repository: self
     trigger:
+      branches:
+        include:
+        - master
+        - dev
+        - qa
+        - release/*
       tags:
         include:
         - v*.*.*

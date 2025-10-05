@@ -1,7 +1,7 @@
 {
   "name": "admin-dashboard",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.1-uat",
   "type": "module",
   "description": "LemoTech Admin Dashboard - Management interface for on-demand cleaning services",
   "main": "dist/index.html",

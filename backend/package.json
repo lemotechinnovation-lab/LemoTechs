@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.0.1-uat",
+  "version": "1.0.1",
   "description": "LemoTech API Backend - On-demand cleaning services",
   "main": "dist/app.js",
   "engines": {

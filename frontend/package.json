@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.0.1-uat",
+  "version": "1.0.1",
   "type": "module",
   "description": "Frontend interface for on-demand cleaning services",
   "main": "dist/index.html",

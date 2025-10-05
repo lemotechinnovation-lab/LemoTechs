@@ -1,5 +1,6 @@
 # LemoTech Unified Deployment Pipeline
 # Intelligent deployment that detects changes and deploys only what's needed
+# Updated for container deployment - UAT Test
 
 # CI Trigger - Runs on code pushes
 trigger:

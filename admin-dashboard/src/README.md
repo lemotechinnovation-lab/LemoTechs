@@ -1,10 +1,10 @@
 # LemoTech Admin Dashboard - Refactored Architecture
 
-## 🏗️ New Component Architecture
+## New Component Architecture
 
 This refactored dashboard implements modern React patterns with reusable components, centralized theming, and improved maintainability.
 
-### 📁 File Structure
+### File Structure
 
 ```
 src/
@@ -26,7 +26,7 @@ src/
 └── README.md                  # This file
 ```
 
-## 🎨 Design System
+## Design System
 
 ### Theme Configuration (`src/theme/index.ts`)
 - **Centralized color palette** with LemoTech brand colors
@@ -43,7 +43,7 @@ gold: '#FFD700'           // Gold accent
 glassBackground: 'rgba(28, 27, 58, 0.95)'
 ```
 
-## 🧩 Reusable Components
+## Reusable Components
 
 ### 1. GlassCard (`src/components/GlassCard.tsx`)
 Base glassmorphism card component with:
@@ -131,7 +131,7 @@ sx={{
 }}
 ```
 
-## 🎯 Performance Optimizations
+## Performance Optimizations
 
 ### Component Memoization
 - Extracted complex UI into smaller, focused components
@@ -143,7 +143,7 @@ sx={{
 - **Reusable utilities**: Formatters, color functions
 - **Centralized theming**: Single source of truth for styles
 
-## 🚀 Usage
+## Usage
 
 ### Basic Setup
 ```tsx
@@ -180,7 +180,7 @@ import { formatCurrency } from './utils/formatters';
 </GlassCard>
 ```
 
-## 🔧 Customization
+## Customization
 
 ### Adding New Colors
 Update `src/theme/index.ts`:
@@ -202,7 +202,7 @@ Follow the established patterns:
 4. Include mobile responsiveness
 5. Use theme colors and typography
 
-## 📈 Benefits of Refactored Architecture
+## Benefits of Refactored Architecture
 
 1. **Maintainability**: Centralized theme and reusable components
 2. **Consistency**: Uniform styling across all elements
@@ -212,7 +212,7 @@ Follow the established patterns:
 6. **Mobile-First**: Responsive design patterns
 7. **Type Safety**: Full TypeScript support
 
-## 🎨 Design System Features
+## Design System Features
 
 - **Glassmorphism**: Consistent blur and transparency effects
 - **Color Harmony**: Complementary teal/aqua accents
